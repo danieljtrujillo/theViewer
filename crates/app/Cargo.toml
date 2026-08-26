@@ -1,0 +1,35 @@
+[package]
+name = "viewer-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The viewer binary."
+
+[[bin]]
+name = "viewer"
+path = "src/main.rs"
+
+[dependencies]
+viewer-scene = { workspace = true }
+viewer-io = { workspace = true }
+viewer-formats = { workspace = true }
+viewer-render = { workspace = true }
+viewer-media = { workspace = true }
+eframe = { version = "0.30.0", default-features = false, features = ["wgpu", "default_fonts"] }
+rfd = "0.17.2"
+wgpu = "23"
+pollster = "0.4"
+image = { version = "0.25.6", default-features = false, features = ["png"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+] }
+
+[features]
+# Keep the console attached in release builds, for the identify and info commands.
+console = []

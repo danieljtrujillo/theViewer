@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: clippy and tests
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The workspace targets x86_64-pc-windows-gnu, which needs dlltool from MinGW
+      # binutils. rustup does not ship it; the runner image carries MSYS2.
+      - name: Add MinGW to PATH
+        run: Add-Content -Path $env:GITHUB_PATH -Value 'C:\msys64\mingw64\bin' -Encoding utf8
+
+      # Installs the channel and components pinned in rust-toolchain.toml.
+      - name: Install the pinned toolchain
+        run: |
+          rustup show
+          rustc --version
+          cargo --version
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace

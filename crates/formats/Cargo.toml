@@ -1,0 +1,39 @@
+[package]
+name = "viewer-formats"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "T0 format importers, statically linked."
+
+[dependencies]
+viewer-scene = { workspace = true }
+viewer-io = { workspace = true }
+viewer-media = { workspace = true }
+gltf = { version = "1.4.1", default-features = false, features = ["utils", "names", "import"] }
+flate2 = "1.1.9"
+zstd = "0.13.3"
+image = { version = "0.25.6", default-features = false, features = ["png", "jpeg", "tga", "bmp", "gif", "webp", "tiff", "ico", "qoi", "pnm", "dds", "ff", "hdr", "exr"] }
+ufbx = "0.11.3"
+serde_json = "1"
+# Pure Rust rather than the bindings to the C++ library. Not a purity preference: the bindings
+# crate hard-codes a dynamic `-lstdc++` for windows-gnu, and one dynamic C++ runtime in the link
+# line is enough to stop `viewer.exe` starting from Explorer. See `crates/app/build.rs`.
+meshopt-rs = "0.1.2"
+dicom-object = "0.9.1"
+dicom-dictionary-std = "0.9.0"
+nifti = { version = "0.17.0", default-features = false, features = ["ndarray_volumes"] }
+dicom-pixeldata = { version = "0.9.1", default-features = false, features = ["native", "rle", "jpeg", "deflate", "openjp2", "charls"] }
+# Not called from any code here. `charls-sys`, which decodes JPEG-LS DICOM frames, pulls this in
+# and by default it emits `-lstdc++`, leaving the executable dependent on `libstdc++-6.dll` sitting
+# next to the compiler. The `nothing` feature suppresses that, and `build.rs` appends the C++
+# runtime as trailing link arguments instead -- which is what lets Explorer launch the viewer.
+link-cplusplus = { version = "1.0.12", default-features = false, features = ["nothing"] }
+zip = { version = "4.2.0", default-features = false, features = ["deflate"] }
+las = { version = "0.11.1", features = ["laz"] }
+e57 = "0.11.13"
+roxmltree = "0.21.1"
+truck-stepio = "0.3.0"
+truck-meshalgo = "0.4.0"
+truck-modeling = "0.6.0"
+openusd = { version = "0.6.0", features = ["geom"] }

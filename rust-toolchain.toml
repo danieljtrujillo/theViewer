@@ -1,0 +1,6 @@
+[toolchain]
+# windows-gnu rather than the usual windows-msvc: this machine has the MSVC compiler but no
+# Windows 10/11 SDK, so the msvc target cannot link. The gnu target is self-contained.
+# Switch to stable-x86_64-pc-windows-msvc if a dependency ever requires it.
+channel = "stable-x86_64-pc-windows-gnu"
+components = ["rustfmt", "clippy"]

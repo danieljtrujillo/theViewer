@@ -1,0 +1,11 @@
+[package]
+name = "viewer-scene"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Core scene model. glTF 2.1 + KHR_gaussian_splatting semantics. No dependencies."
+
+# Deliberately dependency-free. Every other crate imports into this one, so it
+# is the thing that must never churn or drag a version conflict into the tree.
+[dependencies]

@@ -1,0 +1,54 @@
+# Text is stored as LF in the repository and checked out as LF everywhere. Without this,
+# Windows checkouts show dozens of files as modified with no content change.
+* text=auto eol=lf
+
+# Windows script hosts need CRLF. wscript.exe in particular mis-parses an LF-only .vbs.
+*.vbs   text eol=crlf
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Source and shaders.
+*.rs    text eol=lf
+*.wgsl  text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.mjs   text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+
+# Binary assets. Never touch line endings and never try to diff them.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.tga   binary
+*.dds   binary
+*.exr   binary
+*.hdr   binary
+*.qoi   binary
+*.glb   binary
+*.ply   binary
+*.stl   binary
+*.fbx   binary
+*.spz   binary
+*.splat binary
+*.ares  binary
+*.4ds   binary
+*.las   binary
+*.laz   binary
+*.e57   binary
+*.dcm   binary
+*.nii   binary
+*.nrrd  binary
+*.mp4   binary
+*.mov   binary
+*.mkv   binary
+*.webm  binary
+*.exe   binary
+*.pdb   binary
+
+# Generated. Keep it out of diffs and out of the language statistics.
+Cargo.lock  linguist-generated=true -diff

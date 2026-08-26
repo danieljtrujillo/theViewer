@@ -1,0 +1,10 @@
+[package]
+name = "viewer-io"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Format sniffing and the shared streaming layer."
+
+[dependencies]
+memmap2 = { workspace = true }

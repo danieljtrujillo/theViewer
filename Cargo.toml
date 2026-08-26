@@ -1,0 +1,37 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/scene",
+    "crates/io",
+    "crates/formats",
+    "crates/media",
+    "crates/render",
+    "crates/app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+viewer-scene = { path = "crates/scene" }
+viewer-io = { path = "crates/io" }
+viewer-formats = { path = "crates/formats" }
+viewer-media = { path = "crates/media" }
+viewer-render = { path = "crates/render" }
+
+# Keep this list short on purpose. A format that needs more than these earns
+# its own crate behind the T0/T1 line -- see docs/ARCHITECTURE.md.
+memmap2 = "0.9"
+thiserror = "2"
+
+# Release builds are a shipped artifact, not a debug convenience: this app's
+# whole pitch is that it is small and starts instantly.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

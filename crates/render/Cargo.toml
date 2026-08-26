@@ -1,0 +1,15 @@
+[package]
+name = "viewer-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "wgpu renderer: six paths."
+
+# wgpu is deliberately not wired in yet -- pinning a version before there is geometry to draw
+# just invites a churn cycle. Add it when the first importer lands.
+[dependencies]
+bytemuck = { version = "1.25.2", features = ["derive"] }
+glam = { version = "0.33.5", features = ["bytemuck"] }
+viewer-scene = { workspace = true }
+wgpu = "23"
