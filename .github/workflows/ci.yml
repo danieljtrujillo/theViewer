@@ -46,3 +46,9 @@ jobs:
 
       - name: Tests
         run: cargo test --workspace
+
+      # Catches broken and ambiguous intra-doc links, which nothing else does.
+      - name: Docs
+        run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings

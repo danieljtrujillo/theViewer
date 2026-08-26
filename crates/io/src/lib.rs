@@ -2,7 +2,7 @@
 //!
 //! Two jobs, both of which every format in `docs/FORMATS.md` depends on:
 //!
-//! - [`sniff`] identifies a file from its **header bytes**, never its extension. The extension is
+//! - [`mod@sniff`] identifies a file from its **header bytes**, never its extension. The extension is
 //!   at most a tie-breaker.
 //! - [`Source`] is the memory-mapped, range-readable view every streaming format reads through,
 //!   `.ares` GOPs, COPC octants, LAZ chunks and DICOM series are the same problem wearing

@@ -1,7 +1,7 @@
 //! The `.splat` format: antimatter15's, and the one with no header at all.
 //!
 //! Thirty-two bytes per splat and nothing else: no magic, no count, no version. Everything the
-//! viewer needs has to come from the arithmetic, which is why [`viewer_io::sniff`] never calls
+//! viewer needs has to come from the arithmetic, which is why [`viewer_io::sniff()`] never calls
 //! this format better than a guess.
 //!
 //! The layout, which is the whole specification:

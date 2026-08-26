@@ -59,9 +59,10 @@ cargo build --release -p viewer-app --features console # release, console attach
 cargo test --workspace                                 # 323 tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
+cargo doc --workspace --no-deps                        # RUSTDOCFLAGS=-D warnings in CI
 ```
 
-The last three are the gates `.github/workflows/ci.yml` runs on every push, and all three pass on
+The last four are the gates `.github/workflows/ci.yml` runs on every push, and all four pass on
 `main`. `cargo fmt --all` fixes what the check reports.
 
 `EXTENSIONS` in `crates/app/src/shell.rs` carries `#[rustfmt::skip]`. Its grouping comments carry
