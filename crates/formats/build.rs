@@ -2,7 +2,7 @@
 //
 // `charls-sys`, behind DICOM's JPEG-LS support, compiles C++ and needs `libstdc++`. The
 // `windows-gnu` toolchain links it dynamically by default, which leaves `viewer.exe` needing
-// `libstdc++-6.dll` on PATH — true when the build script launches the app, because it puts MinGW
+// `libstdc++-6.dll` on PATH. That is true when the build script launches the app, because it puts MinGW
 // on PATH first, and false the moment Explorer launches it from the Open with menu. The failure
 // is a system error box before `main` ever runs. The dynamic request is turned off by the
 // `nothing` feature on `link-cplusplus` in `Cargo.toml`, so what follows is the only source of
@@ -12,7 +12,7 @@
 // `rustc` lays out the command as: crate objects, rlibs, native libraries from build scripts,
 // its own runtime libraries, and finally everything from `rustc-link-arg`. A `rustc-link-lib`
 // therefore lands *ahead* of the rlibs that need it, and GNU `ld` resolves an archive only
-// against undefined symbols it has already seen — so the C++ runtime has to go at the very end,
+// against undefined symbols it has already seen, so the C++ runtime has to go at the very end,
 // as link arguments, together with everything it in turn depends on.
 //
 // This file is `include!`d by `crates/app/build.rs`, because link arguments apply only to the
@@ -29,7 +29,7 @@
 /// re-scan until nothing new resolves, which is the answer to a cycle.
 ///
 /// `libmsvcrt.a` and `libkernel32.a` are import libraries, so listing them under `-Bstatic` still
-/// produces ordinary DLL imports — it selects the archive, not the linkage.
+/// produces ordinary DLL imports, it selects the archive, not the linkage.
 const TRAILING_LINK_ARGS: &[&str] = &[
     "-Wl,-Bstatic",
     "-Wl,--start-group",

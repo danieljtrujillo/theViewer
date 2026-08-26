@@ -12,14 +12,7 @@ use viewer_scene::Image;
 /// Subdirectories worth checking. Exporters scatter textures into these often enough that the
 /// alternative, failing to find them, is the common case without this list.
 const TEXTURE_DIRS: [&str; 8] = [
-    "",
-    "textures",
-    "Textures",
-    "maps",
-    "Maps",
-    "images",
-    "Images",
-    "tex",
+    "", "textures", "Textures", "maps", "Maps", "images", "Images", "tex",
 ];
 
 /// Extensions to try when the referenced one does not exist. Exporters routinely write `.tga` into

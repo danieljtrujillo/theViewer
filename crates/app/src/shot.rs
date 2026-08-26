@@ -1,7 +1,7 @@
 //! Render a file to a PNG without opening a window.
 //!
-//! Two jobs. It is how the renderer gets checked without a human squinting at a screenshot —
-//! "does a 360 photo actually wrap onto a sphere" is a question with a pixel answer — and it is
+//! Two jobs. It is how the renderer gets checked without a human squinting at a screenshot,
+//! "does a 360 photo actually wrap onto a sphere" is a question with a pixel answer, and it is
 //! the beginning of a thumbnail path, which is the other half of belonging in a shell.
 //!
 //! The device here is created from scratch rather than borrowed from the window, so this runs on a

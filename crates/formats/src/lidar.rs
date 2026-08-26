@@ -2,7 +2,7 @@
 //!
 //! Two formats, one shape, and the same two problems in both.
 //!
-//! **Coordinates are enormous.** A LAS tile is georeferenced — UTM eastings run to seven digits,
+//! **Coordinates are enormous.** A LAS tile is georeferenced: UTM eastings run to seven digits,
 //! and a survey in state-plane feet to eight. Handing those to a renderer with `f32` positions
 //! quantizes a centimetre-accurate scan to somewhere between a decimetre and a metre, and the
 //! camera's near plane fights the far plane for what is left. So both importers **recentre**: the
@@ -10,7 +10,7 @@
 //! scene metadata so nobody has to guess later where it went.
 //!
 //! **Files are bigger than memory.** A county tile is 200 million points. Both readers here are
-//! streaming, and both stop at a point ceiling rather than trying and failing — a viewer that
+//! streaming, and both stop at a point ceiling rather than trying and failing, a viewer that
 //! shows the first twenty million points of a tile and says so is far more useful than one that
 //! exhausts the machine.
 
@@ -109,19 +109,22 @@ impl Accumulator {
             }
         }
 
-        let mut attributes = vec![Attribute::new(
-            Semantic::Position,
-            ComponentType::F32,
-            3,
-            count,
-            bytes,
-        )
-        .map_err(|e| malformed(format.clone(), e.to_string()))?];
+        let mut attributes =
+            vec![
+                Attribute::new(Semantic::Position, ComponentType::F32, 3, count, bytes)
+                    .map_err(|e| malformed(format.clone(), e.to_string()))?,
+            ];
         if self.has_colour {
             attributes.push(
-                Attribute::new(Semantic::Color(0), ComponentType::U8, 4, count, self.colours)
-                    .map_err(|e| malformed(format, e.to_string()))?
-                    .normalized(),
+                Attribute::new(
+                    Semantic::Color(0),
+                    ComponentType::U8,
+                    4,
+                    count,
+                    self.colours,
+                )
+                .map_err(|e| malformed(format, e.to_string()))?
+                .normalized(),
             );
         }
 
@@ -136,11 +139,7 @@ impl Accumulator {
     }
 }
 
-fn assemble(
-    accumulator: Accumulator,
-    format: FormatId,
-    label: &str,
-) -> Result<Scene, ImportError> {
+fn assemble(accumulator: Accumulator, format: FormatId, label: &str) -> Result<Scene, ImportError> {
     if accumulator.is_empty() {
         return Err(malformed(format, "the file holds no points"));
     }
@@ -154,10 +153,7 @@ fn assemble(
     scene.set_meta("points", kept.to_string());
     if kept < seen {
         // Silent truncation reads as "this is the whole file", which it is not.
-        scene.set_meta(
-            "truncated",
-            format!("showing {kept} of {seen} points"),
-        );
+        scene.set_meta("truncated", format!("showing {kept} of {seen} points"));
     }
     // Georeferenced coordinates were removed to keep f32 positions accurate. Saying by how much
     // is what makes the displayed coordinates translatable back to the survey.
@@ -180,8 +176,8 @@ pub fn import_las(path: &Path) -> Result<Scene, ImportError> {
     /// disappears against the decode.
     const BATCH: u64 = 1_000_000;
 
-    let mut reader = las::Reader::from_path(path)
-        .map_err(|e| malformed(FormatId::Las, e.to_string()))?;
+    let mut reader =
+        las::Reader::from_path(path).map_err(|e| malformed(FormatId::Las, e.to_string()))?;
     let header = reader.header().clone();
     let total = header.number_of_points();
     let compressed = header.point_format().is_compressed;
@@ -261,11 +257,14 @@ fn to_eight_bit(r: u16, g: u16, b: u16) -> [u8; 4] {
 /// own pose. They are merged into a single cloud here rather than kept as separate nodes, because
 /// what a viewer is asked for is the site, not the setups.
 pub fn import_e57(path: &Path) -> Result<Scene, ImportError> {
-    let mut file = e57::E57Reader::from_file(path)
-        .map_err(|e| malformed(FormatId::E57, e.to_string()))?;
+    let mut file =
+        e57::E57Reader::from_file(path).map_err(|e| malformed(FormatId::E57, e.to_string()))?;
     let clouds = file.pointclouds();
     if clouds.is_empty() {
-        return Err(malformed(FormatId::E57, "the file declares no point clouds"));
+        return Err(malformed(
+            FormatId::E57,
+            "the file declares no point clouds",
+        ));
     }
     let scans = clouds.len();
 
@@ -276,7 +275,7 @@ pub fn import_e57(path: &Path) -> Result<Scene, ImportError> {
             .map_err(|e| malformed(FormatId::E57, e.to_string()))?;
         for point in iterator {
             let point = point.map_err(|e| malformed(FormatId::E57, e.to_string()))?;
-            // A point can be a direction with no range, or nothing at all — a laser return that
+            // A point can be a direction with no range, or nothing at all, a laser return that
             // never came back. Only fully valid coordinates are points.
             let e57::CartesianCoordinate::Valid { x, y, z } = point.cartesian else {
                 continue;

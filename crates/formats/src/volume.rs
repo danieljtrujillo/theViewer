@@ -125,7 +125,10 @@ pub fn import_nrrd(bytes: &[u8]) -> Result<Scene, ImportError> {
 
     let voxel = voxel.ok_or_else(|| malformed(fmt.clone(), "no type line"))?;
     if dims.contains(&0) {
-        return Err(malformed(fmt.clone(), "sizes must name three positive extents"));
+        return Err(malformed(
+            fmt.clone(),
+            "sizes must name three positive extents",
+        ));
     }
     let count = voxel_count(&dims, fmt.clone())?;
 
@@ -144,7 +147,10 @@ pub fn import_nrrd(bytes: &[u8]) -> Result<Scene, ImportError> {
     if data.len() < expected {
         return Err(malformed(
             fmt.clone(),
-            format!("data is {} bytes, the header predicts {expected}", data.len()),
+            format!(
+                "data is {} bytes, the header predicts {expected}",
+                data.len()
+            ),
         ));
     }
     data.truncate(expected);
@@ -153,11 +159,7 @@ pub fn import_nrrd(bytes: &[u8]) -> Result<Scene, ImportError> {
     }
 
     // NRRD spacings are millimetres by convention; the scene works in metres.
-    let spacing = [
-        spacing[0] * 0.001,
-        spacing[1] * 0.001,
-        spacing[2] * 0.001,
-    ];
+    let spacing = [spacing[0] * 0.001, spacing[1] * 0.001, spacing[2] * 0.001];
 
     Ok(scene_from(
         VolumeGrid {
@@ -365,7 +367,11 @@ pub fn import_dicom(path: &Path) -> Result<Scene, ImportError> {
         "DICOM",
     );
     scene.set_meta("slices", slices.len().to_string());
-    if let Some(m) = first.element(tags::MODALITY).ok().and_then(|e| e.to_str().ok()) {
+    if let Some(m) = first
+        .element(tags::MODALITY)
+        .ok()
+        .and_then(|e| e.to_str().ok())
+    {
         scene.set_meta("modality", m.trim());
     }
     Ok(scene)

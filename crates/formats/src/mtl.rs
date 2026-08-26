@@ -67,13 +67,14 @@ pub fn parse(text: &str, base: &Path, scene: &mut Scene) -> HashMap<String, u32>
     // One image per path, so a texture shared by several materials uploads once.
     let mut image_cache: HashMap<String, u32> = HashMap::new();
 
-    let commit = |material: Option<Material>, scene: &mut Scene, names: &mut HashMap<String, u32>| {
-        if let Some(m) = material {
-            let name = m.name.clone();
-            let index = scene.push_material(m);
-            names.insert(name, index);
-        }
-    };
+    let commit =
+        |material: Option<Material>, scene: &mut Scene, names: &mut HashMap<String, u32>| {
+            if let Some(m) = material {
+                let name = m.name.clone();
+                let index = scene.push_material(m);
+                names.insert(name, index);
+            }
+        };
 
     for line in text.lines() {
         let line = line.trim();

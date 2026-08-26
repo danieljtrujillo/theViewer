@@ -1,6 +1,6 @@
 //! Capture cameras.
 //!
-//! Not a viewport camera — this is the *recorded* rig that produced a capture. COLMAP sparse
+//! Not a viewport camera. This is the *recorded* rig that produced a capture. COLMAP sparse
 //! models and `transforms.json` both carry one, and drawing it is a genuinely useful feature that
 //! costs almost nothing: it turns "this checkpoint is unopenable" into "here is the rig that shot
 //! it, and here are the sparse points."

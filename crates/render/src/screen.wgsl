@@ -2,7 +2,7 @@
 //
 // Neither draws geometry. The flat path is a screen-space rectangle; the panorama path is a
 // full-screen triangle where every fragment turns its own direction into a texture coordinate.
-// Doing it per fragment rather than on a tessellated sphere is both cheaper and exact — a sphere
+// Doing it per fragment rather than on a tessellated sphere is both cheaper and exact: a sphere
 // mesh visibly kinks a panorama at its poles unless it is absurdly dense.
 
 struct Uniforms {

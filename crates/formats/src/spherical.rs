@@ -7,7 +7,7 @@
 //! 2. **The file name.** `_360`, `VR180`, `_TB`, `_LR`. Conventions rather than standards, but the
 //!    only thing many exported files carry.
 //! 3. **The aspect ratio.** A 2:1 image *might* be equirectangular. On its own that is a guess,
-//!    and it is wrong often enough — book scans, film stills, ultrawide screenshots — that it is
+//!    and it is wrong often enough (book scans, film stills, ultrawide screenshots) that it is
 //!    gated behind a resolution floor and always reversible from the toolbar.
 //!
 //! The rule the rest of the app relies on: a wrong guess must be one click from being corrected,
@@ -78,7 +78,7 @@ impl Spherical {
 ///
 /// Parsed by substring rather than by an XML parser on purpose: XMP arrives as a packet embedded
 /// in a JPEG APP1 segment or a PNG `iTXt` chunk, is frequently truncated by the writing tool, and
-/// nothing here needs the tree — only four attribute values, any of which may be absent.
+/// nothing here needs the tree, only four attribute values, any of which may be absent.
 pub fn from_xmp(xmp: &str) -> Option<Spherical> {
     let projection = attribute(xmp, "GPano:ProjectionType")?;
     if !projection.eq_ignore_ascii_case("equirectangular") {
@@ -152,9 +152,15 @@ pub fn from_name(name: &str) -> Option<Spherical> {
         .filter(|t| !t.is_empty())
         .collect();
 
-    let stereo = if tokens.iter().any(|t| matches!(*t, "tb" | "ou" | "topbottom" | "overunder")) {
+    let stereo = if tokens
+        .iter()
+        .any(|t| matches!(*t, "tb" | "ou" | "topbottom" | "overunder"))
+    {
         StereoLayout::OverUnder
-    } else if tokens.iter().any(|t| matches!(*t, "lr" | "sbs" | "leftright")) {
+    } else if tokens
+        .iter()
+        .any(|t| matches!(*t, "lr" | "sbs" | "leftright"))
+    {
         StereoLayout::SideBySide
     } else {
         StereoLayout::Mono
@@ -188,8 +194,8 @@ pub fn from_name(name: &str) -> Option<Spherical> {
 /// photograph would land on the ratio by accident.
 ///
 /// The floor is 2,000 pixels wide. Below it, 2:1 images are usually banners, film stills and UI
-/// screenshots; above it the common wide formats are not 2:1 at all — an ultrawide monitor is
-/// 2.39:1, a dual-monitor screenshot 3.56:1 — so what is left is overwhelmingly stitched
+/// screenshots; above it the common wide formats are not 2:1 at all, an ultrawide monitor is
+/// 2.39:1, a dual-monitor screenshot 3.56:1, so what is left is overwhelmingly stitched
 /// panoramas. The smallest 360 cameras still in use write 2048x1024, which is what sets the exact
 /// number.
 pub fn from_aspect(width: u32, height: u32) -> Option<Spherical> {
@@ -199,7 +205,11 @@ pub fn from_aspect(width: u32, height: u32) -> Option<Spherical> {
     }
     let ratio = width as f32 / height as f32;
     if (ratio - 2.0).abs() < 0.01 {
-        return Some(Spherical::equirect(360.0, StereoLayout::Mono, Evidence::AspectRatio));
+        return Some(Spherical::equirect(
+            360.0,
+            StereoLayout::Mono,
+            Evidence::AspectRatio,
+        ));
     }
     // A 1:1 frame of that size is the over-under packing of two 2:1 eyes -- the standard VR180
     // and 360-stereo layout.

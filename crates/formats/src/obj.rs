@@ -173,7 +173,9 @@ pub fn import(bytes: &[u8], base: Option<&Path>) -> Result<Scene, ImportError> {
                 // Fan triangulation, matching the PLY importer.
                 let group = groups.last_mut().expect("at least one group always exists");
                 for i in 1..poly.len().saturating_sub(1) {
-                    group.indices.extend_from_slice(&[poly[0], poly[i], poly[i + 1]]);
+                    group
+                        .indices
+                        .extend_from_slice(&[poly[0], poly[i], poly[i + 1]]);
                 }
             }
             _ => {}
@@ -366,8 +368,14 @@ mod tests {
                     usemtl a\nf 1 2 3\n\
                     usemtl b\nf 4 5 6\n";
         let scene = import(src, None).unwrap();
-        assert_eq!(scene.nodes[0].payload.as_ref().unwrap().bounds().max[0], 1.0);
-        assert_eq!(scene.nodes[1].payload.as_ref().unwrap().bounds().min[0], 5.0);
+        assert_eq!(
+            scene.nodes[0].payload.as_ref().unwrap().bounds().max[0],
+            1.0
+        );
+        assert_eq!(
+            scene.nodes[1].payload.as_ref().unwrap().bounds().min[0],
+            5.0
+        );
         // The scene bound still spans both.
         assert_eq!(scene.bounds().max[0], 6.0);
     }

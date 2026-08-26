@@ -1,11 +1,11 @@
-//! PCD — the Point Cloud Library's own format.
+//! PCD, the Point Cloud Library's own format.
 //!
 //! An ASCII header naming the fields, then the points in one of three encodings. All three are
 //! implemented, because the third is the one that actually turns up:
 //!
-//! - **`ascii`** — one line per point. Readable, and enormous.
-//! - **`binary`** — the header's declared layout, point after point.
-//! - **`binary_compressed`** — the same values **transposed into field-major order** and then run
+//! - **`ascii`**: one line per point. Readable, and enormous.
+//! - **`binary`**: the header's declared layout, point after point.
+//! - **`binary_compressed`**: the same values **transposed into field-major order** and then run
 //!   through LZF. Transposing first is what makes it compress: all the x coordinates together are
 //!   nearly a ramp, whereas interleaved xyzrgb is nearly random. A reader that decompresses but
 //!   forgets to un-transpose gets a plausible-looking cloud of complete nonsense.
@@ -110,11 +110,18 @@ pub fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
             "WIDTH" => width = parts.next().and_then(|s| s.parse().ok()),
             "HEIGHT" => height = parts.next().and_then(|s| s.parse().ok()),
             "DATA" => {
-                encoding = Some(match parts.next().unwrap_or("ascii").to_ascii_lowercase().as_str() {
-                    "binary" => Encoding::Binary,
-                    "binary_compressed" => Encoding::BinaryCompressed,
-                    _ => Encoding::Ascii,
-                });
+                encoding = Some(
+                    match parts
+                        .next()
+                        .unwrap_or("ascii")
+                        .to_ascii_lowercase()
+                        .as_str()
+                    {
+                        "binary" => Encoding::Binary,
+                        "binary_compressed" => Encoding::BinaryCompressed,
+                        _ => Encoding::Ascii,
+                    },
+                );
                 break;
             }
             _ => {}
@@ -213,15 +220,9 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
     .map_err(|e| malformed(e.to_string()))?];
     if let Some(colours) = colours {
         attributes.push(
-            Attribute::new(
-                Semantic::Color(0),
-                ComponentType::U8,
-                4,
-                count,
-                colours,
-            )
-            .map_err(|e| malformed(e.to_string()))?
-            .normalized(),
+            Attribute::new(Semantic::Color(0), ComponentType::U8, 4, count, colours)
+                .map_err(|e| malformed(e.to_string()))?
+                .normalized(),
         );
     }
 
@@ -275,7 +276,7 @@ fn value(field: &Field, record: &[u8], element: usize) -> Option<f32> {
     })
 }
 
-/// The raw 32 bits of a field, which is what packed colour needs — reading `rgb` as a float and
+/// The raw 32 bits of a field, which is what packed colour needs, reading `rgb` as a float and
 /// converting loses the bit pattern that *is* the colour.
 fn raw_u32(field: &Field, record: &[u8]) -> Option<u32> {
     let raw = record.get(field.offset..field.offset + 4)?;
@@ -449,15 +450,14 @@ fn unpack_rgb(packed: u32) -> [u8; 4] {
 /// stream.
 ///
 /// The format is a sequence of literal runs and back-references. Back-references can overlap the
-/// output written so far — copying a three-byte run to fill thirty is how it encodes a repeat —
+/// output written so far, copying a three-byte run to fill thirty is how it encodes a repeat,
 /// so the copy has to be byte by byte, not a block move.
 pub fn decompress(body: &[u8]) -> Result<Vec<u8>, ImportError> {
     let header = body
         .get(..8)
         .ok_or_else(|| malformed("the compressed body has no length header"))?;
     let compressed = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
-    let uncompressed =
-        u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
+    let uncompressed = u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
 
     // Both lengths come out of the file, so both cap allocations rather than driving them.
     const CEILING: usize = 4 * 1024 * 1024 * 1024;
@@ -552,7 +552,10 @@ mod tests {
         let mut out = [0.0f32; 4];
         colour.get_f32(0, &mut out);
         // 16711680 is 0xFF0000: pure red.
-        assert!((out[0] - 1.0).abs() < 1e-3 && out[1] < 1e-3 && out[2] < 1e-3, "{out:?}");
+        assert!(
+            (out[0] - 1.0).abs() < 1e-3 && out[1] < 1e-3 && out[2] < 1e-3,
+            "{out:?}"
+        );
     }
 
     #[test]
@@ -561,7 +564,10 @@ mod tests {
         assert_eq!(header.points, 3);
         assert_eq!(header.encoding, Encoding::Ascii);
         assert_eq!(header.stride, 16);
-        assert_eq!(&ASCII.as_bytes()[header.data_offset..header.data_offset + 5], b"0 0 0");
+        assert_eq!(
+            &ASCII.as_bytes()[header.data_offset..header.data_offset + 5],
+            b"0 0 0"
+        );
     }
 
     #[test]

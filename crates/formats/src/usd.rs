@@ -1,8 +1,8 @@
-//! OpenUSD — `.usda`, `.usdc` and `.usdz`.
+//! OpenUSD: `.usda`, `.usdc` and `.usdz`.
 //!
 //! USD is a *composition* system before it is a file format: a stage is layers stacked in
 //! strength order, with references, payloads, variants and inherits resolved into one composed
-//! view. Reading the bytes of a `.usda` and looking for `points` gets you a demo, not a viewer —
+//! view. Reading the bytes of a `.usda` and looking for `points` gets you a demo, not a viewer,
 //! any real asset puts its geometry behind at least a reference and usually a variant set.
 //!
 //! So this goes through `openusd`, a native Rust implementation of the composition engine, and
@@ -12,8 +12,8 @@
 //!
 //! - **`metersPerUnit`.** USD carries its own scale, and assets are authored in centimetres about
 //!   as often as in metres.
-//! - **`upAxis`.** USD allows Y-up or Z-up and says which. Z-up assets — most of architecture and
-//!   all of DCC-exported CAD — arrive lying on their side unless the axis is honoured.
+//! - **`upAxis`.** USD allows Y-up or Z-up and says which. Z-up assets, most of architecture and
+//!   all of DCC-exported CAD, arrive lying on their side unless the axis is honoured.
 //! - **Polygons, not triangles.** `faceVertexCounts` is per face and quads are the norm, so the
 //!   mesh has to be triangulated on the way in.
 
@@ -323,8 +323,8 @@ mod tests {
 
     impl Temp {
         fn new(name: &str, text: &str) -> Temp {
-            let path = std::env::temp_dir()
-                .join(format!("viewer-usd-{}-{name}", std::process::id()));
+            let path =
+                std::env::temp_dir().join(format!("viewer-usd-{}-{name}", std::process::id()));
             std::fs::write(&path, text).expect("the temp directory should be writable");
             Temp(path)
         }
@@ -409,7 +409,10 @@ def Xform "World"
         );
         let scene = import(&file.0).unwrap();
         let b = mesh_of(&scene).bounds;
-        assert!(b.min[0] >= 1000.0 - 1e-3, "the parent translate was lost: {b:?}");
+        assert!(
+            b.min[0] >= 1000.0 - 1e-3,
+            "the parent translate was lost: {b:?}"
+        );
     }
 
     #[test]

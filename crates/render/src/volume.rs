@@ -307,7 +307,10 @@ mod tests {
         let (half, range) = to_half(&g);
         assert_eq!(range, (-1000.0, 3000.0));
         let air = f16_to_f32(u16::from_le_bytes([half[0], half[1]]));
-        assert!(air.abs() < 1e-3, "air should sit at the bottom of the range");
+        assert!(
+            air.abs() < 1e-3,
+            "air should sit at the bottom of the range"
+        );
     }
 
     #[test]

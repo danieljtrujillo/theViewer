@@ -147,7 +147,7 @@ impl GpuScene {
         })
     }
 
-    /// Override the projection of the screen payload — the "this 2:1 photograph is not actually a
+    /// Override the projection of the screen payload: the "this 2:1 photograph is not actually a
     /// panorama" button, and its opposite.
     pub fn set_projection(&mut self, projection: viewer_scene::ScreenProjection) {
         for d in &mut self.draws {
@@ -1029,8 +1029,7 @@ impl Renderer {
                         sample_count: 1,
                         dimension: wgpu::TextureDimension::D3,
                         format: wgpu::TextureFormat::R16Float,
-                        usage: wgpu::TextureUsages::TEXTURE_BINDING
-                            | wgpu::TextureUsages::COPY_DST,
+                        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                         view_formats: &[],
                     });
                     queue.write_texture(
@@ -1129,7 +1128,7 @@ impl Renderer {
         }
     }
 
-    /// Replace the contents of the scene's dynamic image — the next video frame, the next
+    /// Replace the contents of the scene's dynamic image: the next video frame, the next
     /// texture of a volumetric capture.
     ///
     /// Same size is the fast path and by far the common one: a straight texture write, no
@@ -1206,10 +1205,7 @@ impl Renderer {
         let normals: &[[f32; 3]] = if has_normals {
             &frame.normals
         } else {
-            derived = derive_normals(
-                &frame.positions,
-                &Indices::U32(frame.indices.clone()),
-            );
+            derived = derive_normals(&frame.positions, &Indices::U32(frame.indices.clone()));
             &derived
         };
 
@@ -1379,9 +1375,7 @@ impl Renderer {
                     pass.set_bind_group(1, bind, &[]);
                     pass.draw(0..6, 0..*count);
                 }
-                Draw::Volume {
-                    bind, vertices, ..
-                } => {
+                Draw::Volume { bind, vertices, .. } => {
                     pass.set_pipeline(&self.volume_pipeline);
                     pass.set_bind_group(1, bind, &[]);
                     pass.set_vertex_buffer(0, vertices.slice(..));

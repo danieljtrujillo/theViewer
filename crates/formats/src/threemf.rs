@@ -1,9 +1,9 @@
-//! 3MF — the 3D Manufacturing Format.
+//! 3MF: the 3D Manufacturing Format.
 //!
 //! A ZIP with an XML model inside it, which is a pleasant change from most of this directory. The
 //! parts that need care are the two that a naive reader gets wrong quietly:
 //!
-//! - **Units.** 3MF declares its own — micron through metre, and inches and feet. A printer file
+//! - **Units.** 3MF declares its own: micron through metre, and inches and feet. A printer file
 //!   in millimetres imported as metres is a thousand times too big, which reads as "the model
 //!   failed to load" because the camera is inside a wall of triangle.
 //! - **The object graph.** An object is either a mesh *or* a list of components referencing other
@@ -54,7 +54,8 @@ fn scale_for(unit: &str) -> f32 {
 struct Transform([f32; 12]);
 
 impl Transform {
-    const IDENTITY: Transform = Transform([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+    const IDENTITY: Transform =
+        Transform([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
 
     fn parse(text: &str) -> Option<Transform> {
         let mut values = [0.0f32; 12];
@@ -78,7 +79,7 @@ impl Transform {
         ]
     }
 
-    /// `self` applied after `outer` — the composition a nested component needs.
+    /// `self` applied after `outer`, the composition a nested component needs.
     fn compose(&self, outer: &Transform) -> Transform {
         let mut out = [0.0f32; 12];
         for row in 0..3 {
@@ -114,11 +115,9 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
     let mut archive =
         zip::ZipArchive::new(cursor).map_err(|e| malformed(format!("not a readable ZIP: {e}")))?;
 
-    let model_path = model_part(&mut archive)
-        .unwrap_or_else(|| "3D/3dmodel.model".to_string());
-    let xml = read_part(&mut archive, &model_path).ok_or_else(|| {
-        malformed(format!("the archive has no model part at {model_path:?}"))
-    })?;
+    let model_path = model_part(&mut archive).unwrap_or_else(|| "3D/3dmodel.model".to_string());
+    let xml = read_part(&mut archive, &model_path)
+        .ok_or_else(|| malformed(format!("the archive has no model part at {model_path:?}")))?;
     let document = roxmltree::Document::parse(&xml)
         .map_err(|e| malformed(format!("the model part is not valid XML: {e}")))?;
 
@@ -137,11 +136,7 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
                     let Some(id) = attribute_u32(&node, "id") else {
                         continue;
                     };
-                    for (i, entry) in node
-                        .children()
-                        .filter(|n| n.is_element())
-                        .enumerate()
-                    {
+                    for (i, entry) in node.children().filter(|n| n.is_element()).enumerate() {
                         let colour = entry
                             .attribute("displaycolor")
                             .or_else(|| entry.attribute("color"))
@@ -215,11 +210,13 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
 
 /// Follow `_rels/.rels` to the model part.
 fn model_part<R: Read + std::io::Seek>(archive: &mut zip::ZipArchive<R>) -> Option<String> {
-    const MODEL_RELATIONSHIP: &str =
-        "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel";
+    const MODEL_RELATIONSHIP: &str = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel";
     let xml = read_part(archive, "_rels/.rels")?;
     let document = roxmltree::Document::parse(&xml).ok()?;
-    for node in document.descendants().filter(|n| n.has_tag_name("Relationship")) {
+    for node in document
+        .descendants()
+        .filter(|n| n.has_tag_name("Relationship"))
+    {
         if node.attribute("Type") == Some(MODEL_RELATIONSHIP) {
             let target = node.attribute("Target")?;
             // Relationship targets are written with a leading slash as often as without.
@@ -263,11 +260,10 @@ fn parse_object(
         return Ok(None);
     };
 
-    let material = attribute_u32(node, "pid")
-        .and_then(|pid| {
-            let index = attribute_u32(node, "pindex").unwrap_or(0);
-            material_index.get(&(pid, index)).copied()
-        });
+    let material = attribute_u32(node, "pid").and_then(|pid| {
+        let index = attribute_u32(node, "pindex").unwrap_or(0);
+        material_index.get(&(pid, index)).copied()
+    });
 
     let mut vertices = Vec::new();
     if let Some(list) = mesh.children().find(|n| n.has_tag_name("vertices")) {
@@ -559,7 +555,10 @@ mod tests {
 </model>"#;
         let scene = import(&package(model)).unwrap();
         let b = mesh(&scene).bounds;
-        assert!((b.min[0] - 0.110).abs() < 1e-6, "expected 110 mm, got {b:?}");
+        assert!(
+            (b.min[0] - 0.110).abs() < 1e-6,
+            "expected 110 mm, got {b:?}"
+        );
     }
 
     #[test]
@@ -577,8 +576,8 @@ mod tests {
 
     #[test]
     fn a_model_with_no_build_section_still_shows_its_objects() {
-        let model =
-            cube_model("millimeter", None).replace(r#"<build><item objectid="1"/></build>"#, "<build/>");
+        let model = cube_model("millimeter", None)
+            .replace(r#"<build><item objectid="1"/></build>"#, "<build/>");
         let scene = import(&package(&model)).expect("objects are worth showing regardless");
         assert_eq!(mesh(&scene).triangle_count(), 2);
     }

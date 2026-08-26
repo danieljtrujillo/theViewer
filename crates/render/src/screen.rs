@@ -1,8 +1,8 @@
 //! The two picture paths: a flat image fitted to the window, and a panorama around the viewer.
 //!
 //! All of the arithmetic lives here rather than in the shader so that it can be tested. Fitting
-//! and framing bugs are the kind that look almost right — a picture 3% too large, a panorama that
-//! drifts as you turn — and staring at a screenshot is a poor way to find them.
+//! and framing bugs are the kind that look almost right: a picture 3% too large, a panorama that
+//! drifts as you turn, and staring at a screenshot is a poor way to find them.
 
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
@@ -23,7 +23,7 @@ pub struct ScreenUniform {
 }
 
 /// How the flat picture is currently positioned. Zoom 1.0 means "fitted", not "one texel per
-/// pixel" — fit is what someone opening a photograph wants, and 1:1 is a keystroke away.
+/// pixel": fit is what someone opening a photograph wants, and 1:1 is a keystroke away.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FlatView {
     pub zoom: f32,
@@ -91,7 +91,9 @@ pub fn zoom_for_one_to_one(image: (u32, u32), viewport: (f32, f32)) -> f32 {
     let fitted_height = scale_y * viewport.1;
     let by_width = image.0 as f32 / fitted_width.max(1e-3);
     let by_height = image.1 as f32 / fitted_height.max(1e-3);
-    by_width.max(by_height).clamp(FlatView::MIN_ZOOM, FlatView::MAX_ZOOM)
+    by_width
+        .max(by_height)
+        .clamp(FlatView::MIN_ZOOM, FlatView::MAX_ZOOM)
 }
 
 fn aspect((w, h): (u32, u32)) -> f32 {
@@ -208,7 +210,10 @@ mod tests {
 
         // Matching aspects fill both axes exactly, with no sliver of background.
         let (sx, sy) = fit_scale(16.0 / 9.0, (1600.0, 900.0));
-        assert!((sx - 1.0).abs() < 1e-5 && (sy - 1.0).abs() < 1e-5, "{sx} {sy}");
+        assert!(
+            (sx - 1.0).abs() < 1e-5 && (sy - 1.0).abs() < 1e-5,
+            "{sx} {sy}"
+        );
     }
 
     #[test]
@@ -244,7 +249,11 @@ mod tests {
         for _ in 0..100 {
             v.pan(1.0, -1.0);
         }
-        assert!(v.offset[0] <= 2.0 + 1e-5 && v.offset[1] >= -2.0 - 1e-5, "{:?}", v.offset);
+        assert!(
+            v.offset[0] <= 2.0 + 1e-5 && v.offset[1] >= -2.0 - 1e-5,
+            "{:?}",
+            v.offset
+        );
     }
 
     #[test]
@@ -307,8 +316,16 @@ mod tests {
             &Camera::default(),
             (1600.0, 900.0),
         );
-        assert!((u.params[1] - std::f32::consts::PI).abs() < 1e-4, "{}", u.params[1]);
-        assert!((u.params[2] - std::f32::consts::PI).abs() < 1e-4, "{}", u.params[2]);
+        assert!(
+            (u.params[1] - std::f32::consts::PI).abs() < 1e-4,
+            "{}",
+            u.params[1]
+        );
+        assert!(
+            (u.params[2] - std::f32::consts::PI).abs() < 1e-4,
+            "{}",
+            u.params[2]
+        );
         assert_eq!(u.params[3], 0.0, "a half turn must not wrap");
     }
 
@@ -360,7 +377,10 @@ mod tests {
 
     #[test]
     fn stereo_selection_picks_one_eye_and_only_one() {
-        assert_eq!(eye_transform(StereoLayout::Mono, false), [1.0, 1.0, 0.0, 0.0]);
+        assert_eq!(
+            eye_transform(StereoLayout::Mono, false),
+            [1.0, 1.0, 0.0, 0.0]
+        );
         assert_eq!(
             eye_transform(StereoLayout::OverUnder, false),
             [1.0, 0.5, 0.0, 0.0]

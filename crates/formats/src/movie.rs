@@ -5,7 +5,7 @@
 //! shape a 360 photo produces, which is why one viewport can present all three without knowing
 //! which it has.
 //!
-//! Decoding is the platform's job — see `viewer-media`. What is decided here is *presentation*:
+//! Decoding is the platform's job, see `viewer-media`. What is decided here is *presentation*:
 //! whether the file is a panorama, how its eyes are packed, and which frame belongs on screen at a
 //! given instant.
 
@@ -143,7 +143,7 @@ fn media_error(format: &viewer_io::FormatId, e: MediaError) -> ImportError {
 ///
 /// The one decoded frame held in `ahead` is what makes this work against a clock. Without it there
 /// is no way to answer "is the frame on screen still the right one?" without decoding a frame and
-/// then having nowhere to put it — and at 60 Hz against 30 fps content, that question is asked
+/// then having nowhere to put it, and at 60 Hz against 30 fps content, that question is asked
 /// twice for every frame that actually changes.
 struct VideoSource {
     video: Video,
@@ -210,7 +210,11 @@ impl FrameSource for VideoSource {
             // If the next frame is also already due, this one is late and gets dropped rather
             // than shown. That is what keeps a stall from turning into permanent drift.
             self.fill()?;
-            if self.ahead.as_ref().is_some_and(|next| next.pts_us <= pts_us) {
+            if self
+                .ahead
+                .as_ref()
+                .is_some_and(|next| next.pts_us <= pts_us)
+            {
                 continue;
             }
 

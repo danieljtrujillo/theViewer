@@ -5,8 +5,8 @@
 //! and installed on a great many machines. Bundling `libheif` and `dav1d` to decode files the
 //! operating system can already decode would add tens of megabytes for a worse result.
 //!
-//! WIC is also the escape hatch for everything else Windows learns to read — camera RAW through a
-//! vendor codec, JPEG XR, whatever ships next — without this crate changing. So it is used as a
+//! WIC is also the escape hatch for everything else Windows learns to read, camera RAW through a
+//! vendor codec, JPEG XR, whatever ships next, without this crate changing. So it is used as a
 //! **fallback** rather than only for the two formats that need it: if the bundled Rust decoders
 //! decline a file, this gets a turn before the viewer gives up.
 
@@ -99,8 +99,8 @@ pub fn decode(path: &Path) -> Result<DecodedImage, MediaError> {
             )));
         }
 
-        // The converter is what turns whatever the codec produced — 10-bit YUV for HEIF, planar
-        // float for some RAW — into one predictable layout.
+        // The converter is what turns whatever the codec produced, 10-bit YUV for HEIF, planar
+        // float for some RAW, into one predictable layout.
         let converter = factory.CreateFormatConverter().map_err(platform)?;
         converter
             .Initialize(
@@ -135,9 +135,11 @@ pub fn decode(path: &Path) -> Result<DecodedImage, MediaError> {
 pub fn can_decode(path: &Path) -> bool {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        let Ok(factory) =
-            CoCreateInstance::<_, IWICImagingFactory>(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)
-        else {
+        let Ok(factory) = CoCreateInstance::<_, IWICImagingFactory>(
+            &CLSID_WICImagingFactory,
+            None,
+            CLSCTX_INPROC_SERVER,
+        ) else {
             return false;
         };
         let url = HSTRING::from(path.as_os_str());
@@ -175,10 +177,8 @@ mod tests {
 
     impl Temp {
         fn new(name: &str, bytes: &[u8]) -> Temp {
-            let path = std::env::temp_dir().join(format!(
-                "viewer-wic-{}-{name}",
-                std::process::id()
-            ));
+            let path =
+                std::env::temp_dir().join(format!("viewer-wic-{}-{name}", std::process::id()));
             std::fs::write(&path, bytes).expect("the temp directory should be writable");
             Temp(path)
         }

@@ -1,7 +1,7 @@
 //! Decoding a bare stream of coded frames, with no container around them.
 //!
 //! `.ares` stores its texture as raw AV1 or VP9 frames inside its own chunks, so there is nothing
-//! for a source reader to demux — the decoder has to be driven directly. That is what an
+//! for a source reader to demux. The decoder has to be driven directly. That is what an
 //! `IMFTransform` is: one input, one output, feed it frames and pull pictures out.
 //!
 //! What is *available* here is not this crate's decision. Windows ships H.264 and HEVC decoders;
@@ -74,10 +74,7 @@ impl Transform {
             input.SetGUID(&MF_MT_SUBTYPE, &subtype).map_err(platform)?;
             // Frame size is packed as two 32-bit values in one 64-bit attribute, width first.
             input
-                .SetUINT64(
-                    &MF_MT_FRAME_SIZE,
-                    ((width as u64) << 32) | height as u64,
-                )
+                .SetUINT64(&MF_MT_FRAME_SIZE, ((width as u64) << 32) | height as u64)
                 .map_err(platform)?;
             input
                 .SetUINT32(&MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive.0 as u32)
@@ -90,7 +87,8 @@ impl Transform {
         // Take the first output type the decoder offers rather than demanding one: a decoder that
         // only speaks NV12 is the norm, and asking it for RGB32 fails outright.
         let (output, stride) = unsafe { negotiate_output(&transform, width)? };
-        let (provides_samples, output_size) = unsafe { output_allocation(&transform, width, height) };
+        let (provides_samples, output_size) =
+            unsafe { output_allocation(&transform, width, height) };
 
         unsafe {
             let _ = transform.ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
@@ -116,9 +114,7 @@ impl Transform {
     /// Discard buffered state so decoding can restart from a keyframe.
     pub fn flush(&mut self) {
         unsafe {
-            let _ = self
-                .transform
-                .ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, 0);
+            let _ = self.transform.ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, 0);
         }
     }
 
@@ -183,7 +179,7 @@ impl Transform {
             let mut status = 0u32;
             // A transform that does not allocate its own samples needs one supplied, sized to
             // what `GetOutputStreamInfo` asked for. Handing it nothing instead is not an error and
-            // not a picture — it simply returns success having done nothing, which is the least
+            // not a picture. It simply returns success having done nothing, which is the least
             // helpful failure mode in the whole API.
             let supplied = if self.provides_samples {
                 None
@@ -201,10 +197,7 @@ impl Transform {
                 pEvents: std::mem::ManuallyDrop::new(None),
             }];
 
-            match self
-                .transform
-                .ProcessOutput(0, &mut buffers, &mut status)
-            {
+            match self.transform.ProcessOutput(0, &mut buffers, &mut status) {
                 Ok(()) => {}
                 // Nothing ready yet: the decoder wants more input first.
                 Err(e) if e.code() == MF_E_TRANSFORM_NEED_MORE_INPUT => {
@@ -429,7 +422,7 @@ fn platform(e: windows::core::Error) -> MediaError {
 /// NV12 to RGBA: a full-resolution luma plane, then a half-resolution interleaved chroma plane.
 ///
 /// BT.709 limited range, which is what every decoder on this path produces at the sizes involved.
-/// Getting the range wrong is not subtle — it washes blacks out to grey — but getting the *matrix*
+/// Getting the range wrong is not subtle (it washes blacks out to grey) but getting the *matrix*
 /// wrong shifts skin tones in a way that is easy to miss, which is why the coefficients are
 /// spelled out rather than approximated.
 ///
@@ -500,9 +493,7 @@ mod tests {
             let out = nv12_to_rgba(&flat(4, 4, luma, 128, 128), 4, 4, 4);
             for px in out.chunks_exact(4) {
                 assert!(
-                    (px[0] as i32 - expected as i32).abs() <= 2
-                        && px[0] == px[1]
-                        && px[1] == px[2],
+                    (px[0] as i32 - expected as i32).abs() <= 2 && px[0] == px[1] && px[1] == px[2],
                     "luma {luma} gave {px:?}"
                 );
                 assert_eq!(px[3], 255);
@@ -515,7 +506,11 @@ mod tests {
         // Limited-range BT.709 primaries. A swapped Cb/Cr shows up here immediately as red and
         // blue trading places.
         let red = nv12_to_rgba(&flat(2, 2, 63, 102, 240), 2, 2, 2);
-        assert!(red[0] > 200 && red[1] < 80 && red[2] < 80, "{:?}", &red[..4]);
+        assert!(
+            red[0] > 200 && red[1] < 80 && red[2] < 80,
+            "{:?}",
+            &red[..4]
+        );
 
         let blue = nv12_to_rgba(&flat(2, 2, 32, 240, 118), 2, 2, 2);
         assert!(blue[2] > 200 && blue[0] < 80, "{:?}", &blue[..4]);

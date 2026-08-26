@@ -31,10 +31,7 @@ fn malformed(binary: bool, reason: impl Into<String>) -> ImportError {
 
 /// Extensions that change how buffer data is encoded. Without a decoder for these, attribute reads
 /// return nothing useful.
-const BLOCKING_EXTENSIONS: [&str; 2] = [
-    "KHR_draco_mesh_compression",
-    "EXT_meshopt_compression",
-];
+const BLOCKING_EXTENSIONS: [&str; 2] = ["KHR_draco_mesh_compression", "EXT_meshopt_compression"];
 
 pub fn import(bytes: &[u8], binary: bool) -> Result<Scene, ImportError> {
     let (document, buffers, _images) =
@@ -177,9 +174,7 @@ fn primitive_to_mesh(
     let mut attributes = vec![f32_attr(Semantic::Position, 3, flat_pos, binary)?];
 
     if let Some(normals) = reader.read_normals() {
-        let flat: Vec<f32> = normals
-            .flat_map(|n| transform_dir(world, n))
-            .collect();
+        let flat: Vec<f32> = normals.flat_map(|n| transform_dir(world, n)).collect();
         if flat.len() / 3 == count {
             attributes.push(f32_attr(Semantic::Normal, 3, flat, binary)?);
         }

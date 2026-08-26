@@ -170,7 +170,11 @@ pub fn info(args: &[String]) -> ExitCode {
                         "bounds", b.min[0], b.min[1], b.min[2], b.max[0], b.max[1], b.max[2]
                     );
                 }
-                println!("    {:<12} {:.1} ms", "import", elapsed.as_secs_f64() * 1000.0);
+                println!(
+                    "    {:<12} {:.1} ms",
+                    "import",
+                    elapsed.as_secs_f64() * 1000.0
+                );
 
                 if let Some(frames) = opened.frames {
                     if !decode_probe(frames, scene.timeline.as_ref()) {
@@ -198,7 +202,10 @@ pub fn info(args: &[String]) -> ExitCode {
 /// Opening a video proves the container parsed; only decoding proves the machine has a codec for
 /// it. Since that is exactly the thing that varies from machine to machine, `info` does it rather
 /// than reporting a successful open and leaving the real question unanswered.
-fn decode_probe(mut frames: Box<dyn viewer_formats::FrameSource>, timeline: Option<&Timeline>) -> bool {
+fn decode_probe(
+    mut frames: Box<dyn viewer_formats::FrameSource>,
+    timeline: Option<&Timeline>,
+) -> bool {
     const PROBE_FRAMES: u32 = 8;
 
     let step_us = timeline
@@ -271,7 +278,7 @@ fn confidence(c: Confidence) -> &'static str {
 /// `viewer shot <input> <output.png> [--size WxH] [--time SECONDS]`
 ///
 /// Renders without a window. Useful on its own, and the only way to check what the renderer
-/// produced on a machine whose display is not compositing — which is the situation on any build
+/// produced on a machine whose display is not compositing, which is the situation on any build
 /// agent, and on this one.
 pub fn shot(args: &[String]) -> ExitCode {
     let mut positional: Vec<&str> = Vec::new();

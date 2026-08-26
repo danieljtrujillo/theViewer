@@ -1,10 +1,10 @@
-//! 4DViews HOLOSYS `.4ds` — read as far as it can honestly be read.
+//! 4DViews HOLOSYS `.4ds`, read as far as it can honestly be read.
 //!
 //! The mesh and DXT1 texture blocks are decodable only through `BridgeCodec4DS.dll`, a licensed
 //! native plugin that cannot be redistributed, so this file will not play here. That is not a
-//! reason to say nothing about it. The **container skeleton** — magic, version, frame count, frame
+//! reason to say nothing about it. The **container skeleton**, magic, version, frame count, frame
 //! rate, texture dimensions, and the trailing frame directory that reveals the keyframe structure
-//! — is plain little-endian data, and reading it turns "unsupported format" into a sentence that
+//! is plain little-endian data, and reading it turns "unsupported format" into a sentence that
 //! tells someone what they have and what it would take to open it.
 //!
 //! The field offsets come from the structural probe in the ARES toolkit
@@ -56,9 +56,8 @@ pub fn probe(bytes: &[u8], file_len: u64) -> Option<Structure> {
         return None;
     }
     let u16_at = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let u32_at = |o: usize| {
-        u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]])
-    };
+    let u32_at =
+        |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
     let u64_at = |o: usize| {
         u64::from_le_bytes([
             bytes[o],

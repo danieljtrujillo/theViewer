@@ -1,7 +1,7 @@
 //! Window, viewport and controls.
 //!
-//! One window presents five kinds of thing — geometry, splats, volumes, pictures and moving
-//! pictures — and the only way that stays coherent is if the *presentation* changes with the
+//! One window presents five kinds of thing: geometry, splats, volumes, pictures and moving
+//! pictures, and the only way that stays coherent is if the *presentation* changes with the
 //! content while the controls stay in the same places. So there is one toolbar, one status bar,
 //! and one viewport whose gestures are re-bound per [`Mode`]: drag orbits a model, pans a
 //! photograph, and looks around a panorama, and in all three cases drag is the thing you reach
@@ -444,7 +444,7 @@ impl App {
         };
         if let Some(mesh) = &frame.mesh {
             renderer.update_mesh(&rs.device, &rs.queue, &mut loaded.gpu, mesh);
-            // A capture's declared bounds before any frame arrives are a guess — the whole camera
+            // A capture's declared bounds before any frame arrives are a guess. The whole camera
             // frustum, for RGBD. Framing once on the first real geometry puts the subject in the
             // window instead of leaving it a speck inside its own view volume.
             if !self.framed_dynamic && !mesh.bounds.is_empty() {
@@ -510,11 +510,7 @@ impl App {
             egui::pos2(rect.left() + 21.0, rect.center().y),
             egui::vec2(26.0, 26.0),
         );
-        let button_response = ui.interact(
-            button,
-            ui.id().with("play"),
-            egui::Sense::click(),
-        );
+        let button_response = ui.interact(button, ui.id().with("play"), egui::Sense::click());
         draw_transport(&painter, button.shrink(8.0), ink, player.playing);
         if button_response.clicked() {
             player.toggle();
@@ -546,11 +542,7 @@ impl App {
         if track.width() < 24.0 {
             return;
         }
-        let scrub = ui.interact(
-            track,
-            ui.id().with("scrub"),
-            egui::Sense::click_and_drag(),
-        );
+        let scrub = ui.interact(track, ui.id().with("scrub"), egui::Sense::click_and_drag());
         let line = egui::Rect::from_min_max(
             egui::pos2(track.left(), track.center().y - 1.5),
             egui::pos2(track.right(), track.center().y + 1.5),
@@ -563,11 +555,7 @@ impl App {
         );
         painter.rect_filled(played, 1.5, ink);
         if scrub.hovered() || scrub.dragged() {
-            painter.circle_filled(
-                egui::pos2(played.right(), line.center().y),
-                4.5,
-                ink,
-            );
+            painter.circle_filled(egui::pos2(played.right(), line.center().y), 4.5, ink);
         }
 
         if scrub.dragged() || scrub.clicked() {
@@ -858,8 +846,10 @@ impl App {
             }
             Mode::Flat => {
                 if response.dragged() {
-                    self.flat
-                        .pan(2.0 * drag.x / size.x.max(1.0), -2.0 * drag.y / size.y.max(1.0));
+                    self.flat.pan(
+                        2.0 * drag.x / size.x.max(1.0),
+                        -2.0 * drag.y / size.y.max(1.0),
+                    );
                 }
                 if response.double_clicked() {
                     // Fit and one-to-one are the two zooms anyone actually wants; a double click
@@ -979,32 +969,30 @@ impl eframe::App for App {
         egui::TopBottomPanel::bottom("status")
             .exact_height(26.0)
             .show(ctx, |ui| {
-                ui.horizontal_centered(|ui| {
-                    match (&self.loaded, &self.error) {
-                        (_, Some(e)) => {
-                            ui.colored_label(egui::Color32::from_rgb(184, 60, 78), e);
-                        }
-                        (Some(l), None) => {
-                            stats(ui, &l.summary, l.bytes);
-                            if let Some(player) = &l.player {
-                                if player.timeline.frame_count > 1 {
-                                    ui.separator();
-                                    ui.weak("Frame");
-                                    ui.label(format!(
-                                        "{} / {}",
-                                        player.current_frame() + 1,
-                                        player.timeline.frame_count
-                                    ));
-                                }
-                            }
-                            let dt = ctx.input(|i| i.stable_dt);
-                            if dt > 0.0 {
-                                ui.separator();
-                                ui.weak(format!("{:.0} fps", 1.0 / dt));
-                            }
-                        }
-                        (None, None) => {}
+                ui.horizontal_centered(|ui| match (&self.loaded, &self.error) {
+                    (_, Some(e)) => {
+                        ui.colored_label(egui::Color32::from_rgb(184, 60, 78), e);
                     }
+                    (Some(l), None) => {
+                        stats(ui, &l.summary, l.bytes);
+                        if let Some(player) = &l.player {
+                            if player.timeline.frame_count > 1 {
+                                ui.separator();
+                                ui.weak("Frame");
+                                ui.label(format!(
+                                    "{} / {}",
+                                    player.current_frame() + 1,
+                                    player.timeline.frame_count
+                                ));
+                            }
+                        }
+                        let dt = ctx.input(|i| i.stable_dt);
+                        if dt > 0.0 {
+                            ui.separator();
+                            ui.weak(format!("{:.0} fps", 1.0 / dt));
+                        }
+                    }
+                    (None, None) => {}
                 });
             });
 
@@ -1031,10 +1019,13 @@ impl eframe::App for App {
                 let h = (size.y * ppp) as u32;
                 let id = self.ensure_offscreen(rs, w, h);
 
-                let (rect, response) =
-                    ui.allocate_exact_size(size, egui::Sense::click_and_drag());
+                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
 
-                let mode = self.loaded.as_ref().map(Loaded::mode).unwrap_or(Mode::Orbit);
+                let mode = self
+                    .loaded
+                    .as_ref()
+                    .map(Loaded::mode)
+                    .unwrap_or(Mode::Orbit);
                 self.handle_viewport_input(ctx, &response, size, mode);
 
                 self.render_viewport(rs, w, h);

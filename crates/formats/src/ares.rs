@@ -6,12 +6,12 @@
 //! texture. `docs/FORMATS.md` §E carries the field-by-field layout; this file implements it.
 //!
 //! Written against the reference implementation in
-//! `G:\StableAudio\4 - Volumetric Interop\ares\packages\core\src` — `format.ts`, `container.ts`,
-//! `demuxer.ts` and `geometry.ts` — and against its real output. Three things from that reading
+//! `G:\StableAudio\4 - Volumetric Interop\ares\packages\core\src`, `format.ts`, `container.ts`,
+//! `demuxer.ts` and `geometry.ts`, and against its real output. Three things from that reading
 //! are load-bearing and easy to get wrong:
 //!
 //! 1. **Positions stay quantized to the superblock's AABB.** `world = min + (q / levels) * size`,
-//!    where `levels = (1 << quant_bits_pos) - 1` and `q` is `u16` at stride 4 — x and y in the
+//!    where `levels = (1 << quant_bits_pos) - 1` and `q` is `u16` at stride 4, x and y in the
 //!    first `u32`, z in the low half of the second.
 //! 2. **Predicted frames are deltas on the quantized integers**, wrapping at 16 bits, not on the
 //!    dequantized floats. Adding them in world space accumulates error across a GOP.
@@ -217,7 +217,8 @@ pub fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
 
     let mut r = Reader::at(bytes, 0);
     let get_u16 = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let get_u32 = |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
+    let get_u32 =
+        |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
     r.pos = h::DURATION_US;
     let duration_us = r.u64().unwrap_or(0);
     r.pos = h::SUPERBLOCK_OFFSET;
@@ -243,7 +244,10 @@ pub fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
 }
 
 fn parse_superblock(bytes: &[u8], offset: u64) -> Result<Superblock, ImportError> {
-    let mut r = Reader::at(bytes, usize::try_from(offset).map_err(|_| malformed("superblock offset out of range"))?);
+    let mut r = Reader::at(
+        bytes,
+        usize::try_from(offset).map_err(|_| malformed("superblock offset out of range"))?,
+    );
     let mut read = || -> Option<Superblock> {
         let min = r.f32x3()?;
         let max = r.f32x3()?;
@@ -413,9 +417,7 @@ fn decode_intra(data: &[u8]) -> Result<QuantGeometry, ImportError> {
         Vec::new()
     };
 
-    let index_len = r
-        .u32()
-        .ok_or_else(|| malformed("truncated index length"))? as usize;
+    let index_len = r.u32().ok_or_else(|| malformed("truncated index length"))? as usize;
     let index_bytes = r
         .take(index_len)
         .ok_or_else(|| malformed("truncated index buffer"))?;
@@ -441,7 +443,7 @@ fn decode_intra(data: &[u8]) -> Result<QuantGeometry, ImportError> {
 
 /// A predicted frame: quantized position deltas, plus optionally fresh UVs and normals.
 ///
-/// The addition wraps at 16 bits by construction — that is what the encoder's subtraction did —
+/// The addition wraps at 16 bits by construction, that is what the encoder's subtraction did,
 /// so `wrapping_add` here is the correct operation and not a way of ignoring overflow.
 fn decode_predicted(data: &[u8], previous: &QuantGeometry) -> Result<QuantGeometry, ImportError> {
     let mut r = Reader::at(data, 0);
@@ -539,11 +541,7 @@ fn decode_meshopt_bytes(bytes: &[u8], vertex_count: usize) -> Result<Vec<u8>, Im
 }
 
 /// Turn quantized geometry into the world-space frame the renderer takes.
-fn to_mesh_frame(
-    q: &QuantGeometry,
-    superblock: &Superblock,
-    include_indices: bool,
-) -> MeshFrame {
+fn to_mesh_frame(q: &QuantGeometry, superblock: &Superblock, include_indices: bool) -> MeshFrame {
     let levels = ((1u32 << superblock.quant_bits_pos.clamp(1, 16)) - 1) as f32;
     let min = superblock.bounds.min;
     let size = superblock.bounds.extent();
@@ -701,7 +699,10 @@ pub fn import(path: &Path, bytes: &[u8]) -> Result<Opened, ImportError> {
     );
     scene.set_meta("frames", header.frame_count.to_string());
     scene.set_meta("frame rate", format!("{:.3} fps", header.fps));
-    scene.set_meta("duration", crate::movie::format_duration(header.duration_us));
+    scene.set_meta(
+        "duration",
+        crate::movie::format_duration(header.duration_us),
+    );
     scene.set_meta("gop length", superblock.gop_length.to_string());
     scene.set_meta(
         "position bits",
@@ -790,10 +791,7 @@ impl GeometryDecoder {
     fn gop_for(&self, frame: u32) -> usize {
         // The index is ordered, so a binary search finds the last GOP starting at or before the
         // frame. Linear scanning a 9,000-frame capture on every seek is the thing to avoid.
-        match self
-            .gops
-            .binary_search_by(|g| g.frame_start.cmp(&frame))
-        {
+        match self.gops.binary_search_by(|g| g.frame_start.cmp(&frame)) {
             Ok(i) => i,
             Err(0) => 0,
             Err(i) => i - 1,
@@ -830,7 +828,7 @@ impl GeometryDecoder {
         }
 
         // Resume from the last decoded frame when it is in the same GOP and lies between that
-        // intra frame and the target — which is the case for ordinary forward playback, and makes
+        // intra frame and the target, which is the case for ordinary forward playback, and makes
         // stepping one frame cost one block.
         let mut cursor = earliest;
         let mut geometry_state: Option<QuantGeometry> = None;
@@ -931,7 +929,11 @@ fn parse_texture_block(
         if r.take(size).is_none() {
             break;
         }
-        out.push((frame_start + i as u32, key, base + start..base + start + size));
+        out.push((
+            frame_start + i as u32,
+            key,
+            base + start..base + start + size,
+        ));
     }
     out
 }
@@ -971,7 +973,10 @@ impl TextureTrack {
         let (decoder, reason) = match viewer_media::StreamDecoder::new(codec, width, height) {
             Ok(d) => {
                 let name = d.name();
-                (Some(d), (!name.is_empty()).then_some(format!("decoded by {name}")))
+                (
+                    Some(d),
+                    (!name.is_empty()).then_some(format!("decoded by {name}")),
+                )
             }
             Err(e) => (None, Some(e.to_string())),
         };
@@ -1155,7 +1160,11 @@ mod tests {
         assert_eq!(r.u32(), None, "a short read must fail, not wrap");
         let mut r = Reader::at(&data, 99);
         assert_eq!(r.u8(), None);
-        assert_eq!(r.take(usize::MAX), None, "an overflowing length must not panic");
+        assert_eq!(
+            r.take(usize::MAX),
+            None,
+            "an overflowing length must not panic"
+        );
     }
 
     #[test]
@@ -1180,9 +1189,18 @@ mod tests {
         let q = QuantGeometry {
             vertex_count: 3,
             positions: vec![
-                0, 0, 0, 0, // the minimum corner
-                levels as u16, levels as u16, levels as u16, 0, // the maximum corner
-                (levels / 2) as u16, (levels / 2) as u16, (levels / 2) as u16, 0,
+                0,
+                0,
+                0,
+                0, // the minimum corner
+                levels as u16,
+                levels as u16,
+                levels as u16,
+                0, // the maximum corner
+                (levels / 2) as u16,
+                (levels / 2) as u16,
+                (levels / 2) as u16,
+                0,
             ],
             uvs: vec![0, 0, 65535, 65535, 32768, 16384],
             normals: Vec::new(),
@@ -1209,12 +1227,7 @@ mod tests {
             normals: vec![0; 4],
             indices: vec![0],
         };
-        let deltas: [u16; 4] = [
-            (-20i16) as u16,
-            10,
-            5,
-            0,
-        ];
+        let deltas: [u16; 4] = [(-20i16) as u16, 10, 5, 0];
         let mut positions = previous.positions.clone();
         for (p, d) in positions.iter_mut().zip(deltas.iter()) {
             *p = p.wrapping_add(*d);
@@ -1231,13 +1244,19 @@ mod tests {
                 let y = j as f32 / 10.0 - 1.0;
                 let n = octahedral_to_normal(x, y);
                 let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-                assert!((len - 1.0).abs() < 1e-4, "{x},{y} gave {n:?} of length {len}");
+                assert!(
+                    (len - 1.0).abs() < 1e-4,
+                    "{x},{y} gave {n:?} of length {len}"
+                );
             }
         }
         // The four cardinal directions have to land where the encoding says.
         assert_eq!(octahedral_to_normal(0.0, 0.0), [0.0, 0.0, 1.0]);
         let down = octahedral_to_normal(1.0, 0.0);
-        assert!((down[0] - 1.0).abs() < 1e-4 && down[2].abs() < 1e-4, "{down:?}");
+        assert!(
+            (down[0] - 1.0).abs() < 1e-4 && down[2].abs() < 1e-4,
+            "{down:?}"
+        );
     }
 
     #[test]

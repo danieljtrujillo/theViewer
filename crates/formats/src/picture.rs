@@ -2,7 +2,7 @@
 //!
 //! A picture is not geometry, and pretending otherwise makes it worse to look at: a photograph
 //! textured onto a quad in a 3D scene has to be hunted down with an orbit camera. So this importer
-//! produces a [`Screen`] payload, and the viewer presents it the way the format means it — fitted
+//! produces a [`Screen`] payload, and the viewer presents it the way the format means it, fitted
 //! to the window for a flat picture, wrapped around the viewer for a panorama.
 //!
 //! Three things here are easy to get wrong and are handled deliberately:
@@ -17,17 +17,15 @@ use std::io::Cursor;
 
 use image::{AnimationDecoder, DynamicImage, ImageFormat};
 use viewer_io::ImageKind;
-use viewer_scene::{
-    Image, Node, Payload, Scene, Screen, ScreenProjection, StereoLayout, Timeline,
-};
+use viewer_scene::{Image, Node, Payload, Scene, Screen, ScreenProjection, StereoLayout, Timeline};
 
 use crate::spherical::{self, Evidence, Spherical};
 use crate::{Frame, FrameSource, ImportError, Opened};
 
 /// Ceiling on an animation held in memory at once.
 ///
-/// GIF and APNG have no seek structure worth the name — reaching frame 400 means decoding 400
-/// frames — so the whole animation is decoded up front and kept. That is fine for the sizes these
+/// GIF and APNG have no seek structure worth the name, reaching frame 400 means decoding 400
+/// frames, so the whole animation is decoded up front and kept. That is fine for the sizes these
 /// formats are actually used at and ruinous past them, hence the cap. Video, which does have a
 /// keyframe index, goes down a different path entirely.
 const MAX_ANIMATION_BYTES: usize = 512 * 1024 * 1024;
@@ -90,7 +88,7 @@ pub fn import(
 /// What to tell someone whose machine cannot decode a format this build delegates.
 ///
 /// Naming the exact package matters. HEIF is the case that catches people out: the *HEIF Image
-/// Extension* is free and widely installed, but it only handles the container — the pixels are
+/// Extension* is free and widely installed, but it only handles the container: the pixels are
 /// HEVC, and the **HEVC Video Extensions** package that decodes them is a separate, paid install.
 /// A machine with the first and not the second reports HEIF as supported and then fails, which is
 /// exactly what a bare "unsupported format" would leave unexplained.
@@ -103,8 +101,9 @@ fn missing_codec(kind: ImageKind) -> String {
         ImageKind::Avif => "no AV1 decoder is installed. The AV1 Video Extension from the \
              Microsoft Store supplies one."
             .to_string(),
-        ImageKind::Jpeg2000 => "Windows ships no JPEG 2000 decoder, and this build carries none."
-            .to_string(),
+        ImageKind::Jpeg2000 => {
+            "Windows ships no JPEG 2000 decoder, and this build carries none.".to_string()
+        }
         other => format!(
             "{} needs a codec neither this build nor this machine has",
             other.label()
@@ -194,10 +193,7 @@ fn assemble(picture: Picture, spherical: Spherical, meta: &Meta, label: &str) ->
     ));
 
     scene.set_meta("format", label);
-    scene.set_meta(
-        "pixels",
-        format!("{} x {}", picture.width, picture.height),
-    );
+    scene.set_meta("pixels", format!("{} x {}", picture.width, picture.height));
     if spherical.is_panorama() || spherical.evidence != Evidence::None {
         scene.set_meta("projection", projection_label(spherical));
         scene.set_meta("projection source", spherical.evidence.label());
@@ -346,8 +342,11 @@ fn decode_animation(bytes: &[u8], kind: ImageKind) -> Result<Option<Animation>, 
 
     let frames = match kind {
         ImageKind::Gif => {
-            let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(malformed)?;
-            decoder.into_frames().take(MAX_ANIMATION_FRAMES + 1)
+            let decoder =
+                image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(malformed)?;
+            decoder
+                .into_frames()
+                .take(MAX_ANIMATION_FRAMES + 1)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(malformed)?
         }
@@ -357,7 +356,9 @@ fn decode_animation(bytes: &[u8], kind: ImageKind) -> Result<Option<Animation>, 
             if !decoder.has_animation() {
                 return Ok(None);
             }
-            decoder.into_frames().take(MAX_ANIMATION_FRAMES + 1)
+            decoder
+                .into_frames()
+                .take(MAX_ANIMATION_FRAMES + 1)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(malformed)?
         }
@@ -423,7 +424,7 @@ fn decode_animation(bytes: &[u8], kind: ImageKind) -> Result<Option<Animation>, 
 /// Rotate and flip according to the EXIF orientation tag.
 ///
 /// The eight values are the four rotations crossed with a mirror. Cameras write 6 and 8 constantly
-/// — those are portrait shots taken by turning the body — and 2, 4, 5 and 7 only turn up from
+/// those are portrait shots taken by turning the body, and 2, 4, 5 and 7 only turn up from
 /// scanners and front-facing lenses, but all eight are one line each.
 fn apply_orientation(image: DynamicImage, orientation: u8) -> DynamicImage {
     match orientation {
@@ -525,7 +526,7 @@ const XMP_NAMESPACE: &[u8] = b"http://ns.adobe.com/xap/1.0/\0";
 ///
 /// Segment walking rather than a full parse: after the SOI every marker is `0xFF` then a type
 /// byte, and every segment except the standalone ones carries a big-endian length. Stopping at
-/// SOS matters — past it the entropy-coded scan contains `0xFF` bytes that are not markers.
+/// SOS matters, past it the entropy-coded scan contains `0xFF` bytes that are not markers.
 fn jpeg_metadata(bytes: &[u8]) -> Meta {
     let mut meta = Meta {
         orientation: 1,
@@ -559,7 +560,8 @@ fn jpeg_metadata(bytes: &[u8]) -> Meta {
                     meta.orientation = o;
                 }
             } else if payload.starts_with(XMP_NAMESPACE) {
-                meta.xmp = Some(String::from_utf8_lossy(&payload[XMP_NAMESPACE.len()..]).into_owned());
+                meta.xmp =
+                    Some(String::from_utf8_lossy(&payload[XMP_NAMESPACE.len()..]).into_owned());
             }
         }
         i += 2 + length;
@@ -575,7 +577,8 @@ fn png_metadata(bytes: &[u8]) -> Meta {
     };
     let mut i = 8usize; // past the signature
     while i + 8 <= bytes.len() {
-        let length = u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
+        let length =
+            u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
         let Some(kind) = bytes.get(i + 4..i + 8) else {
             break;
         };
@@ -646,8 +649,8 @@ fn webp_metadata(bytes: &[u8]) -> Meta {
 
 /// Read tag 0x0112 out of IFD0 of a TIFF block.
 ///
-/// This is the whole of the EXIF parsing this app needs. Both byte orders occur — Canon writes
-/// little-endian, some scanners big — so the reader is parameterized on it rather than assuming.
+/// This is the whole of the EXIF parsing this app needs. Both byte orders occur, Canon writes
+/// little-endian, some scanners big, so the reader is parameterized on it rather than assuming.
 fn exif_orientation(tiff: &[u8]) -> Option<u8> {
     let big_endian = match tiff.get(..2)? {
         b"MM" => true,
@@ -789,7 +792,10 @@ mod tests {
         webp.extend_from_slice(xmp);
 
         let meta = webp_metadata(&webp);
-        assert!(meta.xmp.is_some(), "the chunk after the padded one was lost");
+        assert!(
+            meta.xmp.is_some(),
+            "the chunk after the padded one was lost"
+        );
         assert!(spherical::from_xmp(meta.xmp.as_deref().unwrap())
             .unwrap()
             .is_panorama());

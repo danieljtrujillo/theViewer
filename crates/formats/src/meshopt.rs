@@ -3,7 +3,7 @@
 //! Ported from the scalar decoder in `meshoptimizer`'s `vertexcodec.cpp` (MIT, Arseny Kapoulkine),
 //! which is vendored in the `meshopt` crate's `vendor/src`. Ported rather than linked because the
 //! binding crate hard-codes a dynamic `-lstdc++` on `windows-gnu`, and a `viewer.exe` that needs
-//! `libstdc++-6.dll` on PATH cannot be launched from Explorer — see `crates/app/build.rs`. The
+//! `libstdc++-6.dll` on PATH cannot be launched from Explorer, see `crates/app/build.rs`. The
 //! pure-Rust `meshopt-rs` crate implements only version 0, and every `.ares` file measured here is
 //! version 1, so neither existing option covers the case.
 //!
@@ -16,8 +16,8 @@
 //! - Each byte plane is delta-coded against the previous vertex, zigzagged, then packed at 0, 2, 4
 //!   or 8 bits per value (version 1 adds 1 bit), in groups of 16 with a 2-bit selector each. A
 //!   value of all-ones escapes to a literal byte from a second stream running alongside.
-//! - A **tail** at the very end of the buffer holds the last vertex — which is what the first
-//!   block deltas against — and, in version 1, one control byte per four bytes of stride.
+//! - A **tail** at the very end of the buffer holds the last vertex, which is what the first
+//!   block deltas against, and, in version 1, one control byte per four bytes of stride.
 //!
 //! Version 1 adds two things on top: per-four-byte-column control selecting between packed, all
 //! zero, and literal, and a per-column *channel* mode choosing whether deltas are taken over 1, 2
@@ -65,7 +65,10 @@ impl std::fmt::Display for DecodeError {
             DecodeError::ExtraBytes => {
                 write!(f, "the meshopt vertex buffer has trailing bytes")
             }
-            DecodeError::BadChannel => write!(f, "the meshopt vertex buffer names a channel mode that does not exist"),
+            DecodeError::BadChannel => write!(
+                f,
+                "the meshopt vertex buffer names a channel mode that does not exist"
+            ),
         }
     }
 }
@@ -103,7 +106,11 @@ pub fn decode_vertex_buffer(
 
     let control_size = if version == 0 { 0 } else { vertex_size / 4 };
     let tail_size = vertex_size + control_size;
-    let tail_min = if version == 0 { TAIL_MIN_V0 } else { TAIL_MIN_V1 };
+    let tail_min = if version == 0 {
+        TAIL_MIN_V0
+    } else {
+        TAIL_MIN_V1
+    };
     let tail_padded = tail_size.max(tail_min);
     if data.len() < tail_padded {
         return Err(DecodeError::Truncated);
@@ -152,7 +159,7 @@ fn decode_block<'a>(
     version: u8,
 ) -> Result<&'a [u8], DecodeError> {
     // The four byte-planes of one column, laid end to end at a stride of `vertex_count`. Each is
-    // decoded to the group-aligned length, so the planes overlap by up to 15 bytes — harmless,
+    // decoded to the group-aligned length, so the planes overlap by up to 15 bytes, harmless,
     // because only the first `vertex_count` bytes of each are ever read back.
     let mut planes = [0u8; BLOCK_MAX_VERTICES * 4];
     let mut transposed = [0u8; BLOCK_SIZE_BYTES];
@@ -328,7 +335,11 @@ fn decode_bytes<'a>(
         }
         let group = i / GROUP_SIZE;
         let selector = (header[group / 4] >> ((group % 4) * 2)) & 3;
-        data = decode_group(data, &mut buffer[i..i + GROUP_SIZE], bits[selector as usize]);
+        data = decode_group(
+            data,
+            &mut buffer[i..i + GROUP_SIZE],
+            bits[selector as usize],
+        );
     }
     Ok(data)
 }

@@ -76,8 +76,15 @@ impl Scalar {
 
 #[derive(Debug, Clone)]
 enum Property {
-    Scalar { name: String, ty: Scalar },
-    List { name: String, count: Scalar, item: Scalar },
+    Scalar {
+        name: String,
+        ty: Scalar,
+    },
+    List {
+        name: String,
+        count: Scalar,
+        item: Scalar,
+    },
 }
 
 impl Property {
@@ -141,8 +148,8 @@ fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
     }
     body += 1;
 
-    let text = std::str::from_utf8(&scan[..end])
-        .map_err(|_| malformed("header is not valid UTF-8"))?;
+    let text =
+        std::str::from_utf8(&scan[..end]).map_err(|_| malformed("header is not valid UTF-8"))?;
 
     let mut encoding = None;
     let mut elements: Vec<Element> = Vec::new();
@@ -159,13 +166,17 @@ fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
                 });
             }
             Some("element") => {
-                let name = t.next().ok_or_else(|| malformed("element without a name"))?;
+                let name = t
+                    .next()
+                    .ok_or_else(|| malformed("element without a name"))?;
                 let count: u64 = t
                     .next()
                     .and_then(|v| v.parse().ok())
                     .ok_or_else(|| malformed("element without a count"))?;
                 if count > MAX_ELEMENTS {
-                    return Err(malformed(format!("element {name} declares {count} records")));
+                    return Err(malformed(format!(
+                        "element {name} declares {count} records"
+                    )));
                 }
                 elements.push(Element {
                     name: name.to_string(),
@@ -177,7 +188,9 @@ fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
                 let el = elements
                     .last_mut()
                     .ok_or_else(|| malformed("property outside any element"))?;
-                let kind = t.next().ok_or_else(|| malformed("property without a type"))?;
+                let kind = t
+                    .next()
+                    .ok_or_else(|| malformed("property without a type"))?;
                 if kind == "list" {
                     let count = t.next().and_then(Scalar::parse);
                     let item = t.next().and_then(Scalar::parse);
@@ -193,7 +206,9 @@ fn parse_header(bytes: &[u8]) -> Result<Header, ImportError> {
                 } else {
                     let ty = Scalar::parse(kind)
                         .ok_or_else(|| malformed(format!("unknown property type {kind}")))?;
-                    let name = t.next().ok_or_else(|| malformed("property without a name"))?;
+                    let name = t
+                        .next()
+                        .ok_or_else(|| malformed("property without a name"))?;
                     el.props.push(Property::Scalar {
                         name: name.to_string(),
                         ty,
@@ -270,12 +285,12 @@ impl<'a> Cursor<'a> {
             (Scalar::U32, true) => u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as f64,
             (Scalar::F32, false) => f32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64,
             (Scalar::F32, true) => f32::from_be_bytes([b[0], b[1], b[2], b[3]]) as f64,
-            (Scalar::F64, false) => f64::from_le_bytes([
-                b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-            ]),
-            (Scalar::F64, true) => f64::from_be_bytes([
-                b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-            ]),
+            (Scalar::F64, false) => {
+                f64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]])
+            }
+            (Scalar::F64, true) => {
+                f64::from_be_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]])
+            }
         };
         Ok(v)
     }
@@ -600,7 +615,12 @@ fn vertex_colors(el: &Element, rec: &Records) -> Option<Vec<f32>> {
     let names = [
         ("red", "green", "blue", "alpha"),
         ("r", "g", "b", "a"),
-        ("diffuse_red", "diffuse_green", "diffuse_blue", "diffuse_alpha"),
+        (
+            "diffuse_red",
+            "diffuse_green",
+            "diffuse_blue",
+            "diffuse_alpha",
+        ),
     ];
     for (rn, gn, bn, an) in names {
         if let (Some(r), Some(g), Some(b)) = (
@@ -800,9 +820,18 @@ fn compressed_splats(
         }
     }
     let ranges = [
-        "min_x", "min_y", "min_z", "max_x", "max_y", "max_z", //
-        "min_scale_x", "min_scale_y", "min_scale_z", //
-        "max_scale_x", "max_scale_y", "max_scale_z",
+        "min_x",
+        "min_y",
+        "min_z",
+        "max_x",
+        "max_y",
+        "max_z", //
+        "min_scale_x",
+        "min_scale_y",
+        "min_scale_z", //
+        "max_scale_x",
+        "max_scale_y",
+        "max_scale_z",
     ];
     let mut idx = Vec::with_capacity(ranges.len());
     for name in ranges {
@@ -1035,7 +1064,9 @@ mod tests {
     fn f_rest_is_deinterleaved_by_channel_not_by_coefficient() {
         // Degree 1: 9 values, three coefficients per channel.
         // R = 1,2,3   G = 10,20,30   B = 100,200,300
-        let props: String = (0..9).map(|i| format!("property float f_rest_{i}\n")).collect();
+        let props: String = (0..9)
+            .map(|i| format!("property float f_rest_{i}\n"))
+            .collect();
         let values = "1 2 3 10 20 30 100 200 300";
         let scene = import(&splat_ply(&props, values), PlyVariant::GaussianSplat).unwrap();
         let Payload::SplatCloud(sc) = scene.nodes[0].payload.as_ref().unwrap() else {
@@ -1065,7 +1096,9 @@ mod tests {
 
     #[test]
     fn an_unexpected_f_rest_width_is_rejected_rather_than_guessed() {
-        let props: String = (0..6).map(|i| format!("property float f_rest_{i}\n")).collect();
+        let props: String = (0..6)
+            .map(|i| format!("property float f_rest_{i}\n"))
+            .collect();
         let err = import(&splat_ply(&props, "1 2 3 4 5 6"), PlyVariant::GaussianSplat);
         assert!(err.is_err());
     }

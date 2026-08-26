@@ -1,6 +1,6 @@
 //! The five things a node can actually contain, and the six renderer paths they feed.
 //!
-//! Keeping this enum small is the point. Every format in `docs/FORMATS.md` — all ~230 extensions —
+//! Keeping this enum small is the point. Every format in `docs/FORMATS.md`, all ~230 extensions,
 //! reduces to one of these, which is what keeps the renderer at six paths instead of growing one
 //! per format.
 
@@ -27,7 +27,7 @@ impl Payload {
         }
     }
 
-    /// Which renderer path this payload needs. The RGBD and video-sequence paths are not here —
+    /// Which renderer path this payload needs. The RGBD and video-sequence paths are not here:
     /// those are properties of a *sequence*, not of a single payload.
     pub fn render_path(&self) -> RenderPath {
         match self {
@@ -57,7 +57,7 @@ pub enum RenderPath {
     UnprojectedRgbd,
 }
 
-/// Index buffer width. Kept narrow where the source allows it — a 16-bit index buffer is half the
+/// Index buffer width. Kept narrow where the source allows it: a 16-bit index buffer is half the
 /// upload of a 32-bit one, and plenty of formats never exceed 65,535 vertices per primitive.
 #[derive(Debug, Clone)]
 pub enum Indices {
@@ -131,7 +131,7 @@ impl PointCloud {
 /// A 3D Gaussian splat cloud.
 ///
 /// Attributes are stored with `KHR_gaussian_splatting` semantics (see [`Semantic`]), and stay in
-/// source precision — SPZ's int24 positions and `u8` scales reach the GPU as int24 and `u8`.
+/// source precision: SPZ's int24 positions and `u8` scales reach the GPU as int24 and `u8`.
 #[derive(Debug, Clone)]
 pub struct SplatCloud {
     pub attributes: Vec<Attribute>,
@@ -141,7 +141,7 @@ pub struct SplatCloud {
     pub sh_degree: u8,
     /// Set by SPZ's `flags` bit 0. Changes the rasterizer's covariance dilation.
     pub antialiased: bool,
-    /// Safe orbit bounds if the source supplied them — SPZ 4 vendor extension `0xADBE0002` from
+    /// Safe orbit bounds if the source supplied them: SPZ 4 vendor extension `0xADBE0002` from
     /// Adobe carries exactly this, and honouring it hands the viewer a sane default camera for
     /// free rather than framing the raw AABB, which for splat captures is usually far too large.
     pub orbit_hint: Option<Aabb>,
@@ -153,7 +153,7 @@ impl SplatCloud {
     }
 
     /// Number of SH coefficient triples per splat for a given degree. This is the `shDim / 3`
-    /// sequence SPZ encodes: degree 0/1/2/3 → 0/9/24/45 bytes, i.e. 0/3/8/15 triples.
+    /// sequence SPZ encodes: degree 0/1/2/3 gives 0/9/24/45 bytes, i.e. 0/3/8/15 triples.
     pub const fn sh_coef_count(degree: u8) -> usize {
         match degree {
             0 => 0,
@@ -196,7 +196,7 @@ impl VoxelType {
 /// A dense scalar volume: DICOM series, NIfTI, NRRD, MetaImage, raw + header.
 ///
 /// Sparse grids (VDB, NanoVDB) do not fit this shape and will need a sibling type once that
-/// importer lands — noting it here rather than pretending one struct covers both.
+/// importer lands, noting it here rather than pretending one struct covers both.
 #[derive(Debug, Clone)]
 pub struct VolumeGrid {
     pub dims: [u32; 3],
@@ -219,7 +219,7 @@ impl VolumeGrid {
         self.voxel_count() * self.voxel.size()
     }
 
-    /// The same cheap corruption gate the attribute buffers use — a truncated DICOM series or a
+    /// The same cheap corruption gate the attribute buffers use: a truncated DICOM series or a
     /// raw volume with the wrong declared dimensions fails here rather than rendering garbage.
     pub fn is_consistent(&self) -> bool {
         self.data.len() == self.expected_bytes()
@@ -333,7 +333,7 @@ impl Screen {
     }
 
     /// A flat picture occupies a unit-height rectangle at the origin; a panorama surrounds the
-    /// viewer, so it gets the unit sphere. Neither is what the screen path actually draws — both
+    /// viewer, so it gets the unit sphere. Neither is what the screen path actually draws: both
     /// exist so that scene bounds, framing and the inspector keep working uniformly.
     pub fn bounds(&self) -> Aabb {
         match self.projection {

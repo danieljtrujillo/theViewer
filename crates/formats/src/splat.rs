@@ -1,4 +1,4 @@
-//! The `.splat` format — antimatter15's, and the one with no header at all.
+//! The `.splat` format: antimatter15's, and the one with no header at all.
 //!
 //! Thirty-two bytes per splat and nothing else: no magic, no count, no version. Everything the
 //! viewer needs has to come from the arithmetic, which is why [`viewer_io::sniff`] never calls
@@ -8,15 +8,15 @@
 //!
 //! | Bytes | Field | Encoding |
 //! |---|---|---|
-//! | 0–11 | position | `f32` x, y, z |
-//! | 12–23 | scale | `f32`, already exponentiated |
-//! | 24–27 | colour | `u8` RGBA, already through the SH and sigmoid |
-//! | 28–31 | rotation | `u8` quaternion w, x, y, z, as `(q * 128 + 128)` |
+//! | 0 to 11 | position | `f32` x, y, z |
+//! | 12 to 23 | scale | `f32`, already exponentiated |
+//! | 24 to 27 | colour | `u8` RGBA, already through the SH and sigmoid |
+//! | 28 to 31 | rotation | `u8` quaternion w, x, y, z, as `(q * 128 + 128)` |
 //!
 //! Two of those "already" notes are the interesting part. A `.splat` file has had the 3DGS
 //! training parameters *baked*: `exp()` applied to the log-scales, `sigmoid()` to the opacity
 //! logit, and the degree-0 spherical harmonic evaluated into an 8-bit colour. That makes the file
-//! small and the loader trivial, and it makes higher-degree view-dependent colour unrecoverable —
+//! small and the loader trivial, and it makes higher-degree view-dependent colour unrecoverable,
 //! the format simply threw it away.
 
 use viewer_io::FormatId;
@@ -59,9 +59,8 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
     let mut bounds = Aabb::EMPTY;
 
     for record in bytes.chunks_exact(STRIDE) {
-        let f = |o: usize| {
-            f32::from_le_bytes([record[o], record[o + 1], record[o + 2], record[o + 3]])
-        };
+        let f =
+            |o: usize| f32::from_le_bytes([record[o], record[o + 1], record[o + 2], record[o + 3]]);
         let position = [f(0), f(4), f(8)];
         // A file with no header cannot declare that it is corrupt, so the values have to be
         // checked. One NaN position collapses the bounding box and takes the camera with it.
@@ -127,11 +126,7 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
     Ok(scene)
 }
 
-fn attribute(
-    semantic: Semantic,
-    components: u8,
-    data: Vec<f32>,
-) -> Result<Attribute, ImportError> {
+fn attribute(semantic: Semantic, components: u8, data: Vec<f32>) -> Result<Attribute, ImportError> {
     let count = data.len() / components as usize;
     let bytes: Vec<u8> = data.iter().flat_map(|v| v.to_le_bytes()).collect();
     Attribute::new(semantic, ComponentType::F32, components, count, bytes)

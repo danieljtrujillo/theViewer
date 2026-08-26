@@ -1,11 +1,11 @@
-//! STEP — ISO 10303, the CAD exchange format.
+//! STEP: ISO 10303, the CAD exchange format.
 //!
 //! A STEP file holds no triangles. It holds a **boundary representation**: trimmed NURBS surfaces,
 //! B-spline curves, and the topology saying which bounds which. Showing it means tessellating it,
 //! and tessellation is a numerical problem with a tolerance, not a translation.
 //!
-//! Done here through `truck`, a pure-Rust CAD kernel. That is a real dependency — the tiering in
-//! `docs/FORMATS.md` puts CAD at T2 for exactly this reason — but the alternative is OpenCASCADE,
+//! Done here through `truck`, a pure-Rust CAD kernel. That is a real dependency, the tiering in
+//! `docs/FORMATS.md` puts CAD at T2 for exactly this reason, but the alternative is OpenCASCADE,
 //! which is C++, enormous, and would put a large untrusted-input parser outside Rust's safety
 //! guarantees.
 //!
@@ -41,7 +41,7 @@ fn malformed(reason: impl Into<String>) -> ImportError {
 
 pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
     // STEP is ISO 10303-21 "Part 21" text: ASCII with an escape convention for anything else.
-    // Lossy decoding is right here — a stray byte in a comment must not fail the import.
+    // Lossy decoding is right here: a stray byte in a comment must not fail the import.
     let text = String::from_utf8_lossy(bytes);
 
     let table = truck_stepio::r#in::Table::from_step(&text)
@@ -121,7 +121,11 @@ fn tolerance_for(table: &truck_stepio::r#in::Table) -> f64 {
     let diagonal = (0..3)
         .map(|a| {
             let d = max[a] - min[a];
-            if d.is_finite() { d * d } else { 0.0 }
+            if d.is_finite() {
+                d * d
+            } else {
+                0.0
+            }
         })
         .sum::<f64>()
         .sqrt();

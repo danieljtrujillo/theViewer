@@ -32,8 +32,6 @@ use viewer_scene::{Aabb, AlphaMode, Material, Node, Payload, Scene};
 
 use crate::{sidecar, ImportError};
 
-
-
 fn malformed(reason: impl Into<String>) -> ImportError {
     ImportError::Malformed {
         format: FormatId::Fbx,
@@ -355,6 +353,9 @@ mod tests {
     fn a_minimal_ascii_file_with_no_geometry_reports_that() {
         let src = b"; FBX 7.3.0 project file\nFBXHeaderExtension:  {\n\tFBXVersion: 7300\n}\n";
         let err = import(src, None);
-        assert!(err.is_err(), "a file with no meshes must not import as empty");
+        assert!(
+            err.is_err(),
+            "a file with no meshes must not import as empty"
+        );
     }
 }

@@ -1,7 +1,7 @@
 //! Windows Media Foundation, driven through `IMFSourceReader`.
 //!
-//! The source reader is the right level for a viewer: it demuxes, decodes and — with
-//! `ENABLE_ADVANCED_VIDEO_PROCESSING` — colour-converts and scales, all through whatever hardware
+//! The source reader is the right level for a viewer: it demuxes, decodes and, with
+//! `ENABLE_ADVANCED_VIDEO_PROCESSING`, colour-converts and scales, all through whatever hardware
 //! path the machine has. The alternative, assembling a topology by hand, buys control this app has
 //! no use for.
 //!
@@ -301,7 +301,6 @@ impl Reader {
             rgba: result,
         })
     }
-
 }
 
 /// Copy a BGRA frame out as RGBA, undoing the bottom-up layout if there is one.
@@ -442,7 +441,11 @@ mod tests {
         // The negative stride Media Foundation reports for RGB32. Getting this wrong mirrors
         // every video vertically, which is the single most common Media Foundation bug.
         let out = copy_bgra(&TWO_ROWS, 2, 2, -8);
-        assert_eq!(&out[0..4], &[255, 0, 0, 255], "flipped: top row should be red");
+        assert_eq!(
+            &out[0..4],
+            &[255, 0, 0, 255],
+            "flipped: top row should be red"
+        );
         assert_eq!(&out[8..12], &[0, 0, 255, 255]);
     }
 

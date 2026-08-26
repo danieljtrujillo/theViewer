@@ -2,7 +2,7 @@
 //!
 //! This crate ships no codecs and never will. On Windows it drives **Media Foundation**, which is
 //! hardware accelerated on every GPU made this decade and answers for whatever the machine has
-//! installed — H.264 and HEVC always, AV1 and VP9 when the corresponding Store extension is
+//! installed: H.264 and HEVC always, AV1 and VP9 when the corresponding Store extension is
 //! present. Bundling a software decoder instead would add tens of megabytes, lose the hardware
 //! path, and drag in patent obligations, all to decode files the operating system can already
 //! decode.
@@ -168,8 +168,8 @@ pub struct Picture {
 
 /// Decode a still image through the platform, for formats this build carries no decoder for.
 ///
-/// HEIF and AVIF are the reason it exists — both need a video codec, and Windows already hosts
-/// one — but it is also the escape hatch for camera RAW, JPEG XR, and whatever the platform
+/// HEIF and AVIF are the reason it exists: both need a video codec, and Windows already hosts
+/// one, but it is also the escape hatch for camera RAW, JPEG XR, and whatever the platform
 /// learns to read next.
 pub fn decode_image(path: &Path) -> Result<Picture, MediaError> {
     #[cfg(windows)]
@@ -302,6 +302,9 @@ mod tests {
     fn a_missing_codec_reads_as_something_the_user_can_act_on() {
         let message = MediaError::NoDecoder("AV1".into()).to_string();
         assert!(message.contains("AV1"));
-        assert!(message.contains("Store"), "the user needs to know what to do");
+        assert!(
+            message.contains("Store"),
+            "the user needs to know what to do"
+        );
     }
 }

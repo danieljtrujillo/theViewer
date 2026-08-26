@@ -3,16 +3,16 @@
 //! Everything written here lives under `HKEY_CURRENT_USER`. That is a deliberate limit, not a
 //! shortcut: per-user registration needs no elevation, cannot affect anyone else on the machine,
 //! and is removable by the same app that added it. Nothing is written to `HKEY_LOCAL_MACHINE`, no
-//! file type is *taken over*, and no existing default is changed — Windows decides defaults
+//! file type is *taken over*, and no existing default is changed. Windows decides defaults
 //! through its own Settings UI and an application that tries to route around that is malware
 //! behaviour, whatever its intent.
 //!
 //! Three registrations, each doing a different job:
 //!
-//! 1. **A ProgId** (`GANTASMO.3DViewer.1`) — the identity that owns an icon and a command line.
-//! 2. **`OpenWithProgids` on each extension** — what actually makes the entry appear in the
+//! 1. **A ProgId** (`GANTASMO.3DViewer.1`): the identity that owns an icon and a command line.
+//! 2. **`OpenWithProgids` on each extension**: what actually makes the entry appear in the
 //!    right-click *Open with* submenu. This *adds* to a list; it never replaces one.
-//! 3. **`RegisteredApplications` and `Capabilities`** — what makes the app appear in Windows'
+//! 3. **`RegisteredApplications` and `Capabilities`**: what makes the app appear in Windows'
 //!    own Default Apps page, so the user can make it a default there if they ever want to.
 
 // The registry and the shell notification are Win32 calls; there is no safe wrapper for them in
@@ -41,6 +41,11 @@ const REGISTERED_APPS: &str = r"Software\RegisteredApplications";
 /// Kept explicit rather than derived from the sniffer's extension table: this list is a promise to
 /// the operating system, and a format that is merely *recognized* should not appear in a menu that
 /// implies it opens.
+// The grouping is load-bearing for a reader and rustfmt does not preserve it: left alone it
+// reflows the section headers into trailing comments, so `// Splats` ends up labelling the CAD
+// line. It also does not reach a fixed point on this array, so `cargo fmt --check` fails
+// immediately after `cargo fmt`.
+#[rustfmt::skip]
 pub const EXTENSIONS: &[&str] = &[
     // Geometry
     ".ply", ".obj", ".stl", ".glb", ".gltf", ".fbx", ".3mf",
@@ -63,7 +68,7 @@ pub const EXTENSIONS: &[&str] = &[
 
 /// Where the "have we already asked?" flag lives.
 ///
-/// A file rather than a registry value, so that clearing it — to see the prompt again — is
+/// A file rather than a registry value, so that clearing it (to see the prompt again) is
 /// something a person can do without regedit.
 pub fn state_path() -> Option<PathBuf> {
     let base = std::env::var_os("LOCALAPPDATA")?;
@@ -87,7 +92,11 @@ pub fn consent() -> Consent {
     let Some(path) = state_path() else {
         return Consent::Refused;
     };
-    match std::fs::read_to_string(&path).ok().as_deref().map(str::trim) {
+    match std::fs::read_to_string(&path)
+        .ok()
+        .as_deref()
+        .map(str::trim)
+    {
         Some("granted") => Consent::Granted,
         Some("refused") => Consent::Refused,
         Some("deferred") => Consent::Deferred,
@@ -114,8 +123,8 @@ pub fn record_consent(consent: Consent) {
 /// Whether to put the question to the user on this run.
 ///
 /// Asked at most once per run, only when nothing is registered, and never again after a refusal.
-/// A deferral is worth revisiting — someone who said "not now" on first launch has since chosen to
-/// open the app a second time — but it is asked at most once more, not on every launch.
+/// A deferral is worth revisiting: someone who said "not now" on first launch has since chosen to
+/// open the app a second time, but it is asked at most once more, not on every launch.
 pub fn should_prompt() -> bool {
     if is_registered() {
         return false;
@@ -294,20 +303,11 @@ fn set(path: &str, name: &str, value: &str) -> Result<(), String> {
     // REG_SZ values are counted wide strings and must include their terminator; omitting it makes
     // some readers run past the end of the value.
     let value_w: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
-    let bytes = unsafe {
-        std::slice::from_raw_parts(value_w.as_ptr() as *const u8, value_w.len() * 2)
-    };
+    let bytes =
+        unsafe { std::slice::from_raw_parts(value_w.as_ptr() as *const u8, value_w.len() * 2) };
     let name_w = HSTRING::from(name);
     // SAFETY: `bytes` borrows `value_w`, which outlives the call, and its length is exact.
-    let result = unsafe {
-        RegSetValueExW(
-            key,
-            PCWSTR(name_w.as_ptr()),
-            None,
-            REG_SZ,
-            Some(bytes),
-        )
-    };
+    let result = unsafe { RegSetValueExW(key, PCWSTR(name_w.as_ptr()), None, REG_SZ, Some(bytes)) };
     unsafe {
         let _ = RegCloseKey(key);
     }

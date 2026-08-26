@@ -4,8 +4,8 @@
 //! neutral model of our own design (see `docs/ARCHITECTURE.md`). Two things follow from that, and
 //! they are the reason this crate looks the way it does:
 //!
-//! 1. Attributes are **accessor-shaped** — a byte buffer plus a component type plus a normalized
-//!    flag — so data stays in whatever precision it arrived in. A `u16`-quantized position array
+//! 1. Attributes are **accessor-shaped**, a byte buffer plus a component type plus a normalized
+//!    flag, so data stays in whatever precision it arrived in. A `u16`-quantized position array
 //!    travels from file to GPU buffer without ever widening to `f32` on the CPU. That is not spec
 //!    pedantry; it is the memory posture the whole app is built on.
 //! 2. Splat attributes are named and typed exactly as the Khronos extension names and types them,
@@ -125,7 +125,7 @@ pub struct Node {
     pub name: String,
     pub transform: Mat4,
     pub children: Vec<NodeId>,
-    /// `None` for pure grouping nodes — glTF's model, and it keeps hierarchy intact for formats
+    /// `None` for pure grouping nodes, matching glTF's model, and it keeps hierarchy intact for
     /// that carry meaningful structure (USD, IFC, 3D Tiles) instead of flattening it away.
     pub payload: Option<Payload>,
 }
@@ -160,7 +160,7 @@ pub struct Timeline {
     pub frame_count: u32,
     pub fps: f32,
     pub duration_us: u64,
-    /// True when frames can be seeked independently — an `.ares` GOP index, a video keyframe
+    /// True when frames can be seeked independently: an `.ares` GOP index, a video keyframe
     /// table, a folder of discrete files. False for formats that must be played forward.
     pub seekable: bool,
 }
@@ -179,7 +179,7 @@ impl Timeline {
 }
 
 /// Free-form provenance carried from the source file: title, author, capture rig, colour space,
-/// licence. Deliberately untyped — every format has metadata we do not want to model, and
+/// licence. Deliberately untyped: every format has metadata we do not want to model, and
 /// throwing it away makes the inspector useless.
 pub type Metadata = Vec<(String, String)>;
 
@@ -198,7 +198,7 @@ pub struct Scene {
     /// writable textures rather than upload-once ones, so a video frame does not rebuild a bind
     /// group sixty times a second.
     pub dynamic_images: Vec<u32>,
-    /// Nodes whose mesh geometry is replaced per frame — volumetric video, mesh sequences.
+    /// Nodes whose mesh geometry is replaced per frame: volumetric video, mesh sequences.
     pub dynamic_meshes: Vec<NodeId>,
 }
 
@@ -213,7 +213,7 @@ impl Scene {
         id
     }
 
-    /// Push a node and register it as a root in one step — the common case for a flat import.
+    /// Push a node and register it as a root in one step, the common case for a flat import.
     pub fn push_root(&mut self, node: Node) -> NodeId {
         let id = self.push(node);
         self.roots.push(id);
@@ -268,7 +268,7 @@ impl Scene {
         }
     }
 
-    /// Union of every payload's local bounds. Ignores node transforms for now — correct for the
+    /// Union of every payload's local bounds. Ignores node transforms for now. That is correct for the
     /// flat imports that dominate, and the hierarchy-aware version belongs with the renderer's
     /// transform pass rather than here.
     pub fn bounds(&self) -> Aabb {

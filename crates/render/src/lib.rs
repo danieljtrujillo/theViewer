@@ -20,5 +20,5 @@ pub mod volume;
 pub use camera::Camera;
 pub use gpu::{GpuScene, Renderer, View, DEPTH_FORMAT};
 pub use screen::{zoom_for_one_to_one, FlatView, ScreenUniform};
-pub use volume::{Axis, Projection, VolumeMode, VolumeView};
 pub use viewer_scene::payload::RenderPath;
+pub use volume::{Axis, Projection, VolumeMode, VolumeView};

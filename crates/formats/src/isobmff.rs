@@ -5,9 +5,9 @@
 //!
 //! Both spherical conventions are read, because both are in the wild:
 //!
-//! - **V1 (2015)** — a `uuid` box holding an XML blob. Written by every 360 camera of that era and
+//! - **V1 (2015)**: a `uuid` box holding an XML blob. Written by every 360 camera of that era and
 //!   still by ffmpeg's `-metadata` path.
-//! - **V2 (2017)** — real boxes: `st3d` for the stereo mode, `sv3d`/`proj`/`equi` for the
+//! - **V2 (2017)**: real boxes: `st3d` for the stereo mode, `sv3d`/`proj`/`equi` for the
 //!   projection and its bounds. What YouTube ingests and what modern tools write.
 //!
 //! A file that has been through both pipelines carries both, and they can disagree. V2 wins: it is

@@ -7,7 +7,7 @@ this design has to satisfy.
 
 **Runtime: Rust + wgpu, native.** One binary, no webview, no Chromium. wgpu targets Vulkan on
 Windows/Linux, DX12 on Windows and Metal on macOS from a single codebase, and gives real compute
-shaders — which the splat sorter and the volume raymarcher both need. Rust's memory safety is not
+shaders, which the splat sorter and the volume raymarcher both need. Rust's memory safety is not
 incidental here: FBX was disabled in Microsoft's own 3D Viewer over a parser CVE and never
 re-enabled, and this app is fundamentally *a large collection of parsers for untrusted binary
 files*. That is the single biggest risk in the project and the language choice is the first line
@@ -15,8 +15,8 @@ of defence against it.
 
 **v1 scope: all four families.** Parity set + splats, `.ares` + volumetric video, point clouds +
 LiDAR, and volumes. That means **all six renderer paths ship in v1**. The upside is that the
-streaming layer is genuinely shared — ARES GOPs, COPC octants, LAZ chunks and DICOM series are the
-same indexed-range-read problem — so building them together avoids retrofitting. The cost is
+streaming layer is genuinely shared. ARES GOPs, COPC octants, LAZ chunks and DICOM series are the
+same indexed-range-read problem, so building them together avoids retrofitting. The cost is
 concentrated in one place: volumes are the only family that needs a subsystem (raymarching) that
 nothing else requires.
 
@@ -31,13 +31,13 @@ Why:
 - Every format in FORMATS.md becomes a *thin importer* rather than a translation into an invented
   vocabulary.
 - Export is nearly free, and glTF is the one format everything else can read.
-- glTF is where the industry is converging for both splats and volumetric video — Khronos'
+- glTF is where the industry is converging for both splats and volumetric video: Khronos'
   Volumetric Media Subgroup, and the VFA's May 2026 commitment to adopt glTF as its primary
   format. Aligning now means aligning with wherever volcap standardizes next.
 
 Concretely this means an **accessor-shaped attribute model**: buffers carry a component type and a
 normalization flag, and data stays in whatever precision it arrived in. That is not just spec
-fidelity — it is the memory posture. A `u16`-quantized position array stays `u16` from file to GPU
+fidelity. It is the memory posture. A `u16`-quantized position array stays `u16` from file to GPU
 buffer, and the vertex shader dequantizes against the AABB. This is exactly what `.ares` already
 does, and it is why `.ares` fits this design without adaptation.
 
@@ -61,7 +61,7 @@ plugins/     T1+ formats, resolved lazily. Empty for now.
 ```
 
 Five crates, not fifteen. A format earns its own crate when it drags in a dependency tree the core
-should not carry — that boundary *is* the T0/T1 line from FORMATS.md, so it will assert itself
+should not carry. That boundary *is* the T0/T1 line from FORMATS.md, so it will assert itself
 naturally rather than needing to be guessed up front.
 
 ## Sniffing, not extensions
@@ -71,8 +71,8 @@ force this design:
 
 | Ambiguity | Resolution |
 |---|---|
-| `.ply` is 4 formats | Parse the ASCII header; dispatch on the property list — `f_dc_*` + `scale_*` + `rot_*` means 3DGS, an element named `chunk` means SuperSplat-compressed, faces mean mesh, none of the above means point cloud |
-| `.spz` is 2 encodings | Plaintext `NGSP` at offset 0 means v4+; gzip magic `1f 8b` means v1–v3, whose `NGSP` sits *inside* the compressed stream. **Check v4 first** — getting this backwards fails on the most common splat format in circulation |
+| `.ply` is 4 formats | Parse the ASCII header; dispatch on the property list: `f_dc_*` + `scale_*` + `rot_*` means 3DGS, an element named `chunk` means SuperSplat-compressed, faces mean mesh, none of the above means point cloud |
+| `.spz` is 2 encodings | Plaintext `NGSP` at offset 0 means v4+; gzip magic `1f 8b` means v1 to v3, whose `NGSP` sits *inside* the compressed stream. **Check v4 first**, because getting this backwards fails on the most common splat format in circulation |
 | `.mp4` is 5 things | Plain video, Depthkit CPP, Microsoft HoloVideo, V3C/V-PCC, or MV-HEVC spatial. Needs box-level inspection plus sidecar detection |
 | `.splat` has no header | 32 bytes/splat, no magic at all. `len % 32 == 0` plus value-range plausibility, and only as a low-confidence fallback |
 | `.glb` has two widths | Version field distinguishes standard from the glTF 2.1 64-bit variant |
@@ -86,11 +86,11 @@ Every payload type maps to exactly one:
 
 | Path | Feeds from |
 |---|---|
-| Mesh raster | TriMesh — the parity set, CAD tessellation, volcap frames |
-| Point sprite | PointCloud — PLY/PCD/XYZ, LAS/LAZ/COPC, E57, COLMAP |
-| Sorted splat | SplatCloud — every §C format. GPU radix sort, back-to-front, per frame |
-| Volume raymarch | VolumeGrid — DICOM, NIfTI, NRRD, NanoVDB, VDB |
-| Video-textured sequence | Sequence&lt;TriMesh&gt; + video track — `.ares`, UVOL, per-frame folders |
+| Mesh raster | TriMesh: the parity set, CAD tessellation, volcap frames |
+| Point sprite | PointCloud: PLY/PCD/XYZ, LAS/LAZ/COPC, E57, COLMAP |
+| Sorted splat | SplatCloud: every §C format. GPU radix sort, back-to-front, per frame |
+| Volume raymarch | VolumeGrid: DICOM, NIfTI, NRRD, NanoVDB, VDB |
+| Video-textured sequence | Sequence&lt;TriMesh&gt; + video track: `.ares`, UVOL, per-frame folders |
 | Unprojected RGBD | Depthkit CPP, generic RGBD video, Azure Kinect |
 
 ## Performance posture
@@ -100,7 +100,7 @@ Four rules, each traceable to a measurement in FORMATS.md:
 1. **Quantized end to end.** Positions stay `u16`/`int24` from file to GPU; the vertex shader
    dequantizes against the AABB. Never widen to `f32` on the CPU just to narrow again.
 2. **Sorting is the splat budget, not decoding.** SPZ 4 removed the 10 M-point cap and targets
-   34 M+. A CPU sort at that scale is not viable — GPU radix, with frame-to-frame order reuse
+   34 M+. A CPU sort at that scale is not viable. GPU radix instead, with frame-to-frame order reuse
    under small camera deltas.
 3. **Header reads for identity.** SPZ 4's plaintext header and glTF 2.1's embedded thumbnails both
    exist precisely so a browser can show a file's identity without decoding it. The inspector and
@@ -113,7 +113,7 @@ Four rules, each traceable to a measurement in FORMATS.md:
 The FBX CVE is the design precedent. Every parser that is not ours runs sandboxed with a hard
 memory ceiling and no filesystem or network reach; T2 plugins (Assimp, CAD kernels, video stacks)
 are out-of-process. Bounds and allocation limits are enforced *before* a length field from a file
-is trusted — a corrupt `vertex_count` must fail, not allocate.
+is trusted. A corrupt `vertex_count` must fail rather than allocate.
 
 ---
 
@@ -134,17 +134,17 @@ count from six to seven and eight:
 
 | Path | Feeds from |
 |---|---|
-| Flat picture | `Screen` with `Flat` — a screen-space rectangle, fitted, pannable, zoomable |
-| Panorama | `Screen` with `Equirect` — a full-screen triangle; each fragment turns its own direction into a texture coordinate |
+| Flat picture | `Screen` with `Flat`: a screen-space rectangle, fitted, pannable, zoomable |
+| Panorama | `Screen` with `Equirect`: a full-screen triangle; each fragment turns its own direction into a texture coordinate |
 
 The panorama is computed per fragment rather than drawn on a sphere mesh on purpose: a tessellated
 sphere kinks visibly at the poles unless it is absurdly dense, and the per-fragment form is both
 exact and cheaper.
 
-The viewport's gestures are then **re-bound per mode** — drag orbits a model, pans a photograph,
-and looks around a panorama — while staying in the same places. Same hand, different content.
+The viewport's gestures are then **re-bound per mode**. Drag orbits a model, pans a photograph,
+and looks around a panorama, while staying in the same places. Same hand, different content.
 
-## Three sources of evidence for "is this a panorama?"
+## Three sources of panorama evidence
 
 Metadata, then the file name, then the aspect ratio, and the viewer **says which one it used**.
 That ranking matters because the three are not equally good: XMP `GPano` and the MP4 `st3d`/`sv3d`
@@ -170,7 +170,7 @@ frequently absent. A missing codec produces a sentence naming it, not a failure 
 
 ## Pull, not push
 
-Everything that moves — MP4, animated GIF, `.ares`, Depthkit — implements one trait,
+Everything that moves (MP4, animated GIF, `.ares`, Depthkit) implements one trait,
 `FrameSource`, with one method: *what does the scene look like at this presentation time?* The
 player owns the clock and asks; the decoder knows nothing about time.
 
@@ -186,7 +186,7 @@ position it passed through.
 Not an aesthetic preference. Registering in the **Open with** menu means Explorer launches
 `viewer.exe` directly, with nothing but the system directories on PATH. A binary that needs
 `libstdc++-6.dll` beside the compiler works when the build script launches it and fails with a
-system error box when a user double-clicks a file — the worst possible split, because it passes
+system error box when a user double-clicks a file. That is the worst possible split, because it passes
 every test performed by the person who built it.
 
 Two dependencies compile C++ behind DICOM's pixel decoding, so the C++ runtime is linked
@@ -200,7 +200,7 @@ was worth solving, a second was not.
 
 Everything written to the registry lives under `HKEY_CURRENT_USER`, needs no elevation, and can be
 removed by the same app that added it. The registration *appends* to each extension's
-`OpenWithProgids` list and changes no existing default — Windows decides defaults through its own
+`OpenWithProgids` list and changes no existing default. Windows decides defaults through its own
 Settings UI, and an application that routes around that is behaving like malware whatever its
 intent. Consent is asked once, on first run, with a "never ask again" that is honoured.
 

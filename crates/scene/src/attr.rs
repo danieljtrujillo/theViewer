@@ -3,14 +3,14 @@
 //! This is the piece that makes the memory posture work. An attribute keeps the bytes exactly as
 //! the source file stored them, plus enough type information for the renderer to hand them to the
 //! GPU unchanged. Nothing widens `u16` positions to `f32` on the CPU just so the vertex shader can
-//! narrow them again — `.ares` quantizes to 14 bits, SPZ to int24 fixed-point, SOG to 16-bit split
+//! narrow them again, `.ares` quantizes to 14 bits, SPZ to int24 fixed-point, SOG to 16-bit split
 //! across two images, and all three reach the GPU still quantized.
 
 use crate::Aabb;
 
 /// Component types, matching glTF accessor component types plus the two the splat formats need.
 ///
-/// `I24` has no glTF equivalent — it exists because SPZ stores positions as little-endian signed
+/// `I24` has no glTF equivalent. It exists because SPZ stores positions as little-endian signed
 /// 24-bit fixed point, and unpacking it early would defeat the entire point of this module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ComponentType {
@@ -50,18 +50,21 @@ pub enum Semantic {
     Joints(u8),
     Weights(u8),
 
-    /// `KHR_gaussian_splatting:ROTATION` — VEC4 quaternion.
+    /// `KHR_gaussian_splatting:ROTATION` is a VEC4 quaternion.
     SplatRotation,
-    /// `KHR_gaussian_splatting:SCALE` — VEC3.
+    /// `KHR_gaussian_splatting:SCALE` is a VEC3.
     SplatScale,
-    /// `KHR_gaussian_splatting:OPACITY` — SCALAR.
+    /// `KHR_gaussian_splatting:OPACITY` is a SCALAR.
     SplatOpacity,
-    /// `KHR_gaussian_splatting:SH_DEGREE_{degree}_COEF_{index}` — VEC3.
+    /// `KHR_gaussian_splatting:SH_DEGREE_{degree}_COEF_{index}` is a VEC3.
     ///
     /// Degree 4 exists because SPZ 4 raised the ceiling from 3; the Khronos extension currently
     /// stops at 3, so a degree-4 import has no lossless glTF export yet. That is a real gap, not
     /// an oversight here.
-    SplatSh { degree: u8, index: u8 },
+    SplatSh {
+        degree: u8,
+        index: u8,
+    },
 
     /// Anything a format carries that we do not model. Kept rather than dropped so the inspector
     /// can show it and a round-trip does not silently lose data.
@@ -115,9 +118,12 @@ pub struct Attribute {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttrError {
     /// The declared element count does not match the buffer length. This is the cheapest possible
-    /// corruption gate and every importer should run it — the SPZ importer in particular, where
+    /// corruption gate and every importer should run it: the SPZ importer in particular, where
     /// the exact byte total is known in advance and a zero remainder is a strong integrity signal.
-    LengthMismatch { expected: usize, actual: usize },
+    LengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
     ZeroComponents,
 }
 
@@ -186,7 +192,7 @@ impl Attribute {
 
     /// Read element `i` as `f32`, applying normalization and quantization range.
     ///
-    /// This is the *slow* path, for tools that genuinely need CPU-side values — bounds computation
+    /// This is the *slow* path, for tools that genuinely need CPU-side values: bounds computation
     /// on a format that did not record its own AABB, or the inspector. The render path never calls
     /// it; it uploads `data` and dequantizes in the shader.
     pub fn get_f32(&self, i: usize, out: &mut [f32]) -> bool {

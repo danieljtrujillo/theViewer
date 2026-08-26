@@ -1,4 +1,4 @@
-//! T0 importers — statically linked, no lazy resolution.
+//! T0 importers, statically linked, no lazy resolution.
 //!
 //! Each importer's only job is to turn bytes into a [`viewer_scene::Scene`] while keeping data in
 //! source precision. See `docs/FORMATS.md` for which formats belong here and why the rest do not.
@@ -6,13 +6,13 @@
 //! Nothing is implemented yet; this crate exists so the boundary is real from the start. The
 //! implementation order that follows from `docs/ARCHITECTURE.md`:
 //!
-//! 1. **PLY** — one parser covers four of the sniffer's verdicts, including 3DGS. Highest coverage
+//! 1. **PLY**: one parser covers four of the sniffer's verdicts, including 3DGS. Highest coverage
 //!    per line of code in the whole project.
-//! 2. **SPZ v4 + legacy gzip** — the format most likely to matter, and the one where getting the
+//! 2. **SPZ v4 + legacy gzip**: the format most likely to matter, and the one where getting the
 //!    version dispatch wrong is most visible.
-//! 3. **GLB/glTF** — the parity set's centre of gravity, and the internal model's own vocabulary.
-//! 4. **OBJ / STL** — cheap, and they complete the "double-click anything" story.
-//! 5. **`.ares`** — the reference implementation is already local, so this is wiring rather than
+//! 3. **GLB/glTF**: the parity set's centre of gravity, and the internal model's own vocabulary.
+//! 4. **OBJ / STL**: cheap, and they complete the "double-click anything" story.
+//! 5. **`.ares`**: the reference implementation is already local, so this is wiring rather than
 //!    research.
 
 #![forbid(unsafe_code)]
@@ -36,9 +36,9 @@ pub mod spherical;
 pub mod splat;
 pub mod spz;
 pub mod step;
-pub mod usd;
 pub mod stl;
 pub mod threemf;
+pub mod usd;
 pub mod volume;
 
 use viewer_io::FormatId;
@@ -48,7 +48,7 @@ use viewer_scene::{Image, MeshFrame, Scene, Timeline};
 ///
 /// Two return values rather than one because a static scene and a playing one are genuinely
 /// different things. Video, volumetric video and animated pictures all describe their *shape* once
-/// — a screen, a mesh, a material — and then stream their *contents*. Folding the frame source
+/// a screen, a mesh, a material, and then stream their *contents*. Folding the frame source
 /// into `Scene` would make every still importer carry a field it never sets.
 pub struct Opened {
     pub scene: Scene,
@@ -99,10 +99,13 @@ pub enum ImportError {
     Unimplemented(FormatId),
     /// The format can only be read from a file on disk, and no path was given.
     NeedsPath(FormatId),
-    /// The file is the right format but its contents do not hold together — a length field that
+    /// The file is the right format but its contents do not hold together, a length field that
     /// disagrees with the file, a truncated attribute buffer, a count that would overflow.
     /// Always prefer this over allocating on a number that came out of an untrusted file.
-    Malformed { format: FormatId, reason: String },
+    Malformed {
+        format: FormatId,
+        reason: String,
+    },
     Io(std::io::Error),
 }
 

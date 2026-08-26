@@ -30,7 +30,7 @@ C++. `tools/build-and-run.ps1` finds it automatically. From a shell:
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:LOCALAPPDATA\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.MSVCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin;$env:Path"
 ```
 
-MinGW is needed to **build**. The resulting `viewer.exe` needs nothing but Windows — see trap 9.
+MinGW is needed to **build**. The resulting `viewer.exe` needs nothing but Windows. See trap 9.
 
 Release builds detach from the console. `--features console` keeps it attached, which the
 `identify`, `info`, `shot` and `open-with` commands need.
@@ -41,24 +41,24 @@ Release builds detach from the console. `--features console` keeps it attached, 
 |---|---|---|
 | glTF 2.0 / 2.1 | `.glb` `.gltf` | corpus |
 | Wavefront OBJ | `.obj` | corpus, ARES bake output |
-| PLY — mesh, points, 3DGS, SuperSplat | `.ply` | corpus |
+| PLY: mesh, points, 3DGS, SuperSplat | `.ply` | corpus |
 | STL binary and ASCII | `.stl` | corpus |
-| SPZ v1–v4 | `.spz` | — |
+| SPZ v1 to v4 | `.spz` | not yet |
 | FBX | `.fbx` | `D:\3d\logo2.fbx`, a Unity asset |
-| **3MF** | `.3mf` | `D:\T-Rex.3mf` — 13,814 triangles, mm→m correct |
-| **STEP** | `.step` `.stp` | `D:\New folder\...\200113-waltzWheel (1).step` — 2 shells, 95,401 triangles |
+| **3MF** | `.3mf` | `D:\T-Rex.3mf`, 13,814 triangles, mm to m correct |
+| **STEP** | `.step` `.stp` | `D:\New folder\...\200113-waltzWheel (1).step`, 2 shells, 95,401 triangles |
 | **OpenUSD** | `.usda` `.usdc` `.usdz` `.usd` | synthetic stages: composition, units, up-axis, transforms |
 | **`.splat`** | `.splat` | synthetic |
-| **PCD** | `.pcd` | synthetic — ascii, binary, binary_compressed |
+| **PCD** | `.pcd` | synthetic: ascii, binary, binary_compressed |
 | **LAS / LAZ** | `.las` `.laz` | synthetic |
 | **E57** | `.e57` | synthetic |
 | DICOM series | `.dcm` | a 132-slice MR series |
-| NIfTI, NRRD | `.nii` `.nii.gz` `.nrrd` | — |
+| NIfTI, NRRD | `.nii` `.nii.gz` `.nrrd` | not yet |
 | Pictures | 13 raster formats | real photographs |
-| **HEIF / AVIF / anything WIC knows** | `.heic` `.avif` … | `D:\Pictures\IMG_2998.HEIC` — correctly reports the missing HEVC codec |
+| **HEIF / AVIF / anything WIC knows** | `.heic` `.avif` and the rest | `D:\Pictures\IMG_2998.HEIC`, correctly reports the missing HEVC codec |
 | 360 photos and video | any of the above | corpus panoramas |
 | Video | `.mp4` `.mov` `.mkv` `.webm` `.avi` `.wmv` | H.264 phone video; **VP9 `.mkv` 1080p** |
-| ARES volumetric | `.ares` | `daniel-coherent-v4.ares` — geometry + VP9 texture |
+| ARES volumetric | `.ares` | `daniel-coherent-v4.ares`, geometry plus VP9 texture |
 | Depthkit RGBD | `.mp4` + sidecar | a real capture, 458 frames |
 | 4DViews | `.4ds` | container reported; blocks need a licensed DLL |
 
@@ -68,7 +68,7 @@ sprite, sorted splat, volume raymarch, flat picture, panorama.
 ## How to check things without a display
 
 `viewer shot <in> <out.png> [--size WxH] [--time SECONDS]` renders one frame with no window.
-**This machine's desktop does not composite a GPU window into a screen capture** — screenshots of
+**This machine's desktop does not composite a GPU window into a screen capture**. Screenshots of
 the running app come back blank even when it is working, and force-killing it leaves ghost pixels
 that survive a desktop redraw. Every visual claim above was checked with `shot`.
 
@@ -94,11 +94,11 @@ many carried a picture, and the decoded extent.
 ## Not done
 
 - **Audio.** Video plays silent.
-- **`.sog`** — see above.
+- **`.sog`**, see above.
 - **Matroska spherical metadata** is not read; MP4's is. A `.mkv` panorama falls back to the file
   name and the 2:1 shape.
 - **Apple spatial video (MV-HEVC)** and **Insta360** are recognized but not unpacked.
-- **JPEG 2000** — neither this build nor Windows has a decoder.
+- **JPEG 2000**. Neither this build nor Windows has a decoder.
 - Spherical harmonic bands above degree 0 are parsed and stored but never evaluated, so splat
   colour is view-independent.
 - Attribute data widens to `f32` on upload, and `.ares` positions are dequantized on the CPU. The
@@ -106,7 +106,7 @@ many carried a picture, and the decoded extent.
 - Splat depth sorting is a CPU radix sort, not a compute shader.
 - Volume slice mode draws the plane in 3D space, so it tilts with the camera.
 - The NV12 to RGBA conversion is scalar; at 2048² it is measurable.
-- USD reads meshes only — no materials, no instancing through `PointInstancer`, no subdivision.
+- USD reads meshes only: no materials, no instancing through `PointInstancer`, no subdivision.
 - STEP has no colour: the tessellated shells arrive with the default material.
 
 ## Traps worth remembering
@@ -130,7 +130,7 @@ many carried a picture, and the decoded extent.
    `include!`s. The reasoning is not obvious: `rustc` places build-script link *arguments* after
    its own runtime libraries, so the C++ runtime and everything it needs have to be appended as one
    `--start-group` at the end of the line. This is also why the `meshopt` C++ bindings were
-   replaced by a port — see trap 16.
+   replaced by a port. See trap 16.
 10. **A wgpu pipeline and its render pass must agree on the depth attachment.** The picture paths
     write no depth and test none, but still declare a depth state.
 11. **Buffers a player rewrites need `COPY_DST` from the start.**
@@ -141,7 +141,7 @@ many carried a picture, and the decoded extent.
     produces nothing, and the picture never arrives.
 14. **`.ares` texture frame ranges are offsets within their block.** Slicing the whole file with
     them feeds the decoder container bytes, which it accepts frame after frame without ever
-    emitting a picture — indistinguishable from a missing codec until you check the offsets.
+    emitting a picture, indistinguishable from a missing codec until the offsets are checked.
 15. **`.ares` geometry blocks are not always I-then-P.** Captures rebuilt per frame are entirely
     intra; the decoder dispatches on each block's own type and seeks to the nearest intra frame at
     or before the target.
@@ -154,8 +154,8 @@ many carried a picture, and the decoded extent.
 19. **HEIF needs two Store packages, not one.** The free *HEIF Image Extension* reads the container;
     the pixels are HEVC and need the separate paid *HEVC Video Extensions*. A machine with only the
     first reports HEIF as supported and then fails with `0xC00D5212`.
-20. **A raw string containing `"#` ends an `r#"…"#` literal.** 3MF test fixtures embed
-    `displaycolor="#FF0000"`, so they need `r##"…"##`.
+20. **A raw string containing `"#` ends an `r#"..."#` literal.** 3MF test fixtures embed
+    `displaycolor="#FF0000"`, so they need `r##"..."##`.
 21. **`las` 0.11 is column-oriented.** `read_points(n)` returns a `PointData` whose `x()`, `y()`,
     `rgb()` are iterators borrowing it; they must be collected before the next read.
 22. **LAS colour is 16-bit but half the writers store 8-bit values unscaled.** Shifting
@@ -188,7 +188,7 @@ Volume viewer conventions come from the author's own WebGL2 viewer in
 The `.ares` container reader follows the author's own reference implementation in
 `G:\StableAudio\4 - Volumetric Interop\ares\packages\core\src`; the Depthkit decode gates come from
 that repository's `docs/rgbd-rebuild-pipeline.md`. Both are credited in the files that use them. No
-capture content from either set was read, rendered or reproduced — the Depthkit capture set is
+capture content from either set was read, rendered or reproduced. The Depthkit capture set is
 under NDA and was verified by measurement only.
 
 The meshopt vertex decoder is a port of the scalar path in `vertexcodec.cpp` from meshoptimizer

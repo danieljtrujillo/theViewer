@@ -1,7 +1,7 @@
 //! Depthkit "combined per pixel" RGBD video.
 //!
-//! One ordinary H.264 file carrying two pictures stacked in each frame — the colour image, and the
-//! same view with depth painted as a rainbow — plus a small JSON sidecar holding the depth
+//! One ordinary H.264 file carrying two pictures stacked in each frame: the colour image, and the
+//! same view with depth painted as a rainbow, plus a small JSON sidecar holding the depth
 //! camera's intrinsics and its near and far clip. Nothing proprietary is involved: an ordinary
 //! video decoder plus an unprojection gets you a moving surface, which is why `docs/FORMATS.md`
 //! §E.4 calls it the best value-per-effort in the whole volumetric section.
@@ -27,9 +27,7 @@ use viewer_io::FormatId;
 use viewer_media::Video;
 use viewer_scene::attr::{Attribute, ComponentType, Semantic};
 use viewer_scene::payload::{Indices, TriMesh};
-use viewer_scene::{
-    Aabb, AlphaMode, Image, Material, MeshFrame, Node, Payload, Scene, Timeline,
-};
+use viewer_scene::{Aabb, AlphaMode, Image, Material, MeshFrame, Node, Payload, Scene, Timeline};
 
 use crate::{Frame, FrameSource, ImportError, Opened};
 
@@ -85,7 +83,7 @@ pub enum Layout {
 
 /// The sidecar that turns a video into a capture: `<name>.txt`, or `<name>_metadata.json`.
 ///
-/// Both spellings are Depthkit's own — the exporter changed between versions and both are still
+/// Both spellings are Depthkit's own: the exporter changed between versions and both are still
 /// in circulation, frequently in the same folder.
 pub fn sidecar_for(video: &Path) -> Option<PathBuf> {
     let stem = video.file_stem()?.to_str()?;
@@ -147,7 +145,7 @@ pub fn layout_for(frame: (u32, u32), depth: (u32, u32)) -> Option<Layout> {
 /// Which half is the rainbow.
 ///
 /// Decided from the pixels rather than assumed, because the exporter's order changed between
-/// versions and reading it the wrong way round unprojects the *colour* image as depth — which
+/// versions and reading it the wrong way round unprojects the *colour* image as depth, which
 /// produces a surface, just not one that corresponds to anything.
 fn depth_is_first(rgba: &[u8], frame: (u32, u32), layout: Layout) -> bool {
     let (w, h) = (frame.0 as usize, frame.1 as usize);
@@ -179,12 +177,8 @@ fn depth_is_first(rgba: &[u8], frame: (u32, u32), layout: Layout) -> bool {
     };
 
     match layout {
-        Layout::Stacked { .. } => {
-            saturation_of(0, 0, w, h / 2) > saturation_of(0, h / 2, w, h)
-        }
-        Layout::SideBySide { .. } => {
-            saturation_of(0, 0, w / 2, h) > saturation_of(w / 2, 0, w, h)
-        }
+        Layout::Stacked { .. } => saturation_of(0, 0, w, h / 2) > saturation_of(0, h / 2, w, h),
+        Layout::SideBySide { .. } => saturation_of(0, 0, w / 2, h) > saturation_of(w / 2, 0, w, h),
     }
 }
 
@@ -365,24 +359,18 @@ impl FrameSource for DepthkitSource {
             .is_some_and(|last| index < last || index > last + 30)
             || (self.served.is_none() && index > 0)
         {
-            self.video
-                .seek(pts_us)
-                .map_err(|e| self.media_error(e))?;
+            self.video.seek(pts_us).map_err(|e| self.media_error(e))?;
         }
 
-        let Some(video_frame) = self
-            .video
-            .next_frame()
-            .map_err(|e| self.media_error(e))?
-        else {
+        let Some(video_frame) = self.video.next_frame().map_err(|e| self.media_error(e))? else {
             self.ended = true;
             return Ok(None);
         };
         self.frame_size = (video_frame.width, video_frame.height);
 
-        let depth_first = *self.depth_first.get_or_insert_with(|| {
-            depth_is_first(&video_frame.rgba, self.frame_size, self.layout)
-        });
+        let depth_first = *self
+            .depth_first
+            .get_or_insert_with(|| depth_is_first(&video_frame.rgba, self.frame_size, self.layout));
         let mesh = unproject(
             &video_frame.rgba,
             self.frame_size,
@@ -670,7 +658,11 @@ mod tests {
         assert!((b.max[2] + k.near).abs() < 1e-5);
         assert!((b.min[2] + k.far).abs() < 1e-5);
         // About a metre and a quarter across at the far plane, for a 848 px sensor at f=425.
-        assert!(b.extent()[0] > 1.0 && b.extent()[0] < 10.0, "{:?}", b.extent());
+        assert!(
+            b.extent()[0] > 1.0 && b.extent()[0] < 10.0,
+            "{:?}",
+            b.extent()
+        );
     }
 
     /// A synthetic frame: a flat plane at mid depth in the top half, grey in the bottom.

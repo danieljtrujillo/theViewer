@@ -2,7 +2,7 @@
 //!
 //! Decoding happens on its own thread for one reason: a hardware video decode takes several
 //! milliseconds and a slow one takes twenty, and neither is an acceptable pause in a UI that
-//! redraws sixty times a second. The interface between the two is deliberately narrow — the UI
+//! redraws sixty times a second. The interface between the two is deliberately narrow, the UI
 //! thread posts the presentation time it wants and picks up whatever has arrived since, and never
 //! blocks on either.
 //!
@@ -161,8 +161,8 @@ impl Player {
 
     /// Advance the clock and collect whatever the decoder has produced.
     ///
-    /// `dt` is wall-clock seconds since the last call. Clamped, because a stalled frame — a
-    /// window drag, a display sleep — would otherwise jump the clock forward by seconds and take
+    /// `dt` is wall-clock seconds since the last call. Clamped, because a stalled frame, a
+    /// window drag, a display sleep, would otherwise jump the clock forward by seconds and take
     /// a seek to recover from.
     pub fn advance(&mut self, dt: f32) -> Option<Frame> {
         if self.playing {
@@ -208,7 +208,10 @@ impl Player {
             }
         }
 
-        if !self.inflight && self.error.is_none() && self.requests.send(Request::Frame(self.clock_us)).is_ok() {
+        if !self.inflight
+            && self.error.is_none()
+            && self.requests.send(Request::Frame(self.clock_us)).is_ok()
+        {
             self.inflight = true;
         }
         newest

@@ -56,7 +56,10 @@ struct Header {
 
 fn parse_header(b: &[u8], encoding: SpzEncoding) -> Result<Header, ImportError> {
     if b.len() < HEADER_LEN {
-        return Err(malformed(encoding, "file is shorter than the 16-byte header"));
+        return Err(malformed(
+            encoding,
+            "file is shorter than the 16-byte header",
+        ));
     }
     let magic = u32::from_le_bytes([b[0], b[1], b[2], b[3]]);
     if magic != MAGIC {
@@ -160,8 +163,8 @@ fn import_v4(bytes: &[u8]) -> Result<Scene, ImportError> {
         if at + 4 > bytes.len() {
             return Err(malformed(e, "file ends before an attribute stream header"));
         }
-        let len = u32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]])
-            as usize;
+        let len =
+            u32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]]) as usize;
         at += 4;
         let end = at
             .checked_add(len)
@@ -176,7 +179,10 @@ fn import_v4(bytes: &[u8]) -> Result<Scene, ImportError> {
         if out.len() != expected {
             return Err(malformed(
                 e,
-                format!("an attribute stream decoded to {} bytes, expected {expected}", out.len()),
+                format!(
+                    "an attribute stream decoded to {} bytes, expected {expected}",
+                    out.len()
+                ),
             ));
         }
         Ok(out)

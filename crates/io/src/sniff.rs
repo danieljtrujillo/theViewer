@@ -3,10 +3,10 @@
 //! The extension picks the candidate set; the header picks the parser. `docs/FORMATS.md` §Ground
 //! rules explains why, and the ambiguities that force it:
 //!
-//! - `.ply` is four different formats — mesh, point cloud, 3DGS, SuperSplat-compressed 3DGS.
-//! - `.spz` is two encodings — v4's plaintext header, or v1–v3 where the `NGSP` magic sits *inside*
+//! - `.ply` is four different formats: mesh, point cloud, 3DGS, SuperSplat-compressed 3DGS.
+//! - `.spz` is two encodings: v4's plaintext header, or v1 to v3 where the `NGSP` magic sits *inside*
 //!   a gzip stream. Checking gzip first would misclassify every v4 file.
-//! - `.mp4` is five things — plain video, Depthkit CPP, Microsoft HoloVideo, V3C/V-PCC, MV-HEVC.
+//! - `.mp4` is five things: plain video, Depthkit CPP, Microsoft HoloVideo, V3C/V-PCC, MV-HEVC.
 //! - `.splat` has no magic at all; only its 32-byte stride distinguishes it, which can never be
 //!   more than a weak structural guess.
 //!
@@ -21,7 +21,7 @@ pub const HEADER_BYTES: usize = 8192;
 pub enum Confidence {
     /// The extension is all we have. Never enough to commit to a parser on its own.
     ExtensionOnly,
-    /// Content-shaped guess — text that looks like OBJ, a length divisible by the record size.
+    /// Content-shaped guess: text that looks like OBJ, a length divisible by the record size.
     Heuristic,
     /// Structure checks out: declared sizes agree with the actual file length.
     Structural,
@@ -55,7 +55,7 @@ pub enum ImageKind {
     Dds,
     Pnm,
     Farbfeld,
-    /// Radiance RGBE — high dynamic range, and the usual container for a light probe.
+    /// Radiance RGBE: high dynamic range, and the usual container for a light probe.
     Hdr,
     OpenExr,
     /// Recognized, not decoded: needs an AV1 decoder.
@@ -73,7 +73,7 @@ impl ImageKind {
     ///
     /// AVIF, HEIF and JPEG 2000 have no Rust decoder in this build, but the platform hosts one
     /// on most machines, so they are offered rather than refused; the importer says plainly when
-    /// the codec turns out to be missing. SVG is different in kind — it is vector, and there are
+    /// the codec turns out to be missing. SVG is different in kind: it is vector, and there are
     /// no pixels to sample at any size.
     pub fn is_decodable(self) -> bool {
         !matches!(self, ImageKind::Svg)
@@ -103,7 +103,7 @@ impl ImageKind {
     }
 }
 
-/// Video containers. What plays is decided by the platform decoder, not by this list — Windows
+/// Video containers. What plays is decided by the platform decoder, not by this list. Windows
 /// Media Foundation ships no codecs of its own and answers for whatever is installed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VideoKind {
@@ -139,7 +139,7 @@ impl VideoKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpzEncoding {
-    /// v1–v3: the whole file is a gzip stream; `NGSP` is inside it.
+    /// v1 to v3: the whole file is a gzip stream; `NGSP` is inside it.
     Gzip,
     /// v4+ (2026-05-05): plaintext header at offset 0, then per-attribute ZSTD streams.
     PlaintextV4,
@@ -148,7 +148,9 @@ pub enum SpzEncoding {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FormatId {
     // --- T0, the parity set ---
-    Glb { sixty_four_bit: bool },
+    Glb {
+        sixty_four_bit: bool,
+    },
     GltfJson,
     Obj,
     Ply(PlyVariant),
@@ -208,10 +210,7 @@ impl FormatId {
             // The container is parsed and reported, but the mesh and texture blocks need a
             // licensed native codec that cannot be redistributed.
             FormatId::FourDs => false,
-            FormatId::Zip
-            | FormatId::Gzip
-            | FormatId::Isobmff
-            | FormatId::Unknown => false,
+            FormatId::Zip | FormatId::Gzip | FormatId::Isobmff | FormatId::Unknown => false,
             _ => true,
         }
     }
@@ -224,7 +223,9 @@ impl FormatId {
             FormatId::Ply(PlyVariant::Mesh) => "PLY mesh",
             FormatId::Ply(PlyVariant::PointCloud) => "PLY point cloud",
             FormatId::Ply(PlyVariant::GaussianSplat) => "PLY Gaussian splats",
-            FormatId::Ply(PlyVariant::CompressedGaussianSplat) => "PLY Gaussian splats (compressed)",
+            FormatId::Ply(PlyVariant::CompressedGaussianSplat) => {
+                "PLY Gaussian splats (compressed)"
+            }
             FormatId::StlBinary => "STL (binary)",
             FormatId::StlAscii => "STL (ASCII)",
             FormatId::ThreeMf => "3MF",
@@ -311,7 +312,7 @@ fn ext_of(name: Option<&str>) -> Option<String> {
 /// `header` should be up to [`HEADER_BYTES`]; `file_len` is the total file size, which several
 /// structural checks need; `name` is an optional file name used only as a tie-breaker.
 ///
-/// Returns candidates sorted by descending confidence. An empty result is impossible — an
+/// Returns candidates sorted by descending confidence. An empty result is impossible: an
 /// unrecognized file yields a single [`FormatId::Unknown`].
 pub fn sniff(header: &[u8], file_len: u64, name: Option<&str>) -> Vec<Candidate> {
     let mut out: Vec<Candidate> = Vec::new();
@@ -754,7 +755,9 @@ fn image_note(kind: ImageKind) -> &'static str {
         ImageKind::Bmp => "BM plus a length field that matches the file exactly",
         ImageKind::Ico => "icon directory with a plausible image count",
         ImageKind::Pnm => "Netpbm magic followed by whitespace",
-        ImageKind::Svg => "XML whose document element is <svg>: vector, so there is nothing to sample",
+        ImageKind::Svg => {
+            "XML whose document element is <svg>: vector, so there is nothing to sample"
+        }
         ImageKind::Avif | ImageKind::Heif | ImageKind::Jpeg2000 => {
             "decoded by the platform, which needs the matching codec installed"
         }
@@ -987,7 +990,10 @@ mod tests {
                   property float opacity\nproperty float scale_0\nproperty float rot_0\n\
                   end_header\n";
         assert_eq!(ply_variant(h), PlyVariant::GaussianSplat);
-        assert_eq!(top(h, 1000, Some("a.ply")).format, FormatId::Ply(PlyVariant::GaussianSplat));
+        assert_eq!(
+            top(h, 1000, Some("a.ply")).format,
+            FormatId::Ply(PlyVariant::GaussianSplat)
+        );
     }
 
     #[test]
@@ -1084,7 +1090,10 @@ mod tests {
     fn ares_header_is_recognized() {
         let mut h = b"ARES".to_vec();
         h.extend_from_slice(&[0, 1]);
-        assert_eq!(top(&h, 49_700_000, Some("daniel-s0.ares")).format, FormatId::Ares);
+        assert_eq!(
+            top(&h, 49_700_000, Some("daniel-s0.ares")).format,
+            FormatId::Ares
+        );
     }
 
     #[test]
@@ -1093,12 +1102,16 @@ mod tests {
         h.extend_from_slice(&2u32.to_le_bytes());
         assert_eq!(
             top(&h, 1024, None).format,
-            FormatId::Glb { sixty_four_bit: false }
+            FormatId::Glb {
+                sixty_four_bit: false
+            }
         );
         // Past the 4 GB ceiling it cannot be a classic GLB regardless of the version field.
         assert_eq!(
             top(&h, 5_000_000_000, None).format,
-            FormatId::Glb { sixty_four_bit: true }
+            FormatId::Glb {
+                sixty_four_bit: true
+            }
         );
     }
 
@@ -1265,7 +1278,10 @@ mod tests {
     fn dicom_magic_sits_at_offset_128() {
         let mut h = vec![0u8; 132];
         h[128..132].copy_from_slice(b"DICM");
-        assert_eq!(top(&h, 500_000, Some("slice001.dcm")).format, FormatId::Dicom);
+        assert_eq!(
+            top(&h, 500_000, Some("slice001.dcm")).format,
+            FormatId::Dicom
+        );
     }
 
     #[test]
@@ -1277,7 +1293,8 @@ mod tests {
 
     #[test]
     fn obj_is_recognized_from_its_directives() {
-        let h = b"# exported\nmtllib scene.mtl\nv 0.0 0.0 0.0\nv 1.0 0.0 0.0\nv 0.0 1.0 0.0\nf 1 2 3\n";
+        let h =
+            b"# exported\nmtllib scene.mtl\nv 0.0 0.0 0.0\nv 1.0 0.0 0.0\nv 0.0 1.0 0.0\nf 1 2 3\n";
         let c = top(h, 512, Some("scene.obj"));
         assert_eq!(c.format, FormatId::Obj);
     }
@@ -1310,7 +1327,8 @@ mod tests {
         // demoted one level. The ordering that must hold is the effective one.
         let h = b"PK\x03\x04\x14\x00\x00\x00";
         let cands = sniff(h, 4096, Some("bundle.sog"));
-        let level = |c: &Candidate| c.confidence as i32 - if is_container(&c.format) { 1 } else { 0 };
+        let level =
+            |c: &Candidate| c.confidence as i32 - if is_container(&c.format) { 1 } else { 0 };
         for w in cands.windows(2) {
             assert!(level(&w[0]) >= level(&w[1]));
         }

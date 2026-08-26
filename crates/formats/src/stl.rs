@@ -35,9 +35,11 @@ pub fn import_binary(bytes: &[u8]) -> Result<Scene, ImportError> {
     }
     let count = u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]) as usize;
     let needed = 84usize
-        .checked_add(count.checked_mul(50).ok_or_else(|| {
-            malformed(true, "triangle count overflows the addressable range")
-        })?)
+        .checked_add(
+            count
+                .checked_mul(50)
+                .ok_or_else(|| malformed(true, "triangle count overflows the addressable range"))?,
+        )
         .ok_or_else(|| malformed(true, "triangle count overflows the addressable range"))?;
     if bytes.len() < needed {
         return Err(malformed(
@@ -131,7 +133,14 @@ fn build(tris: Vec<[f32; 3]>, binary: bool) -> Result<Scene, ImportError> {
     };
 
     let mut scene = Scene::new();
-    scene.set_meta("format", if binary { "STL (binary)" } else { "STL (ASCII)" });
+    scene.set_meta(
+        "format",
+        if binary {
+            "STL (binary)"
+        } else {
+            "STL (ASCII)"
+        },
+    );
     scene.push_root(Node::with_payload(
         "stl",
         Payload::TriMesh(TriMesh {
