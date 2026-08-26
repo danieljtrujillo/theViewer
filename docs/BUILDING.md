@@ -28,6 +28,16 @@ Windows SDK, then edit that file. Nothing else in the workspace assumes `gnu`, e
 `crates/formats/build.rs`, which is guarded on the target environment and does nothing under
 `msvc`.
 
+That file names a full toolchain, `stable-x86_64-pc-windows-gnu`, rather than a bare channel. The
+tuple is load-bearing. A gnu *host* cannot be selected any other way, and the alternatives
+(`targets = [...]` plus `--target`, or `[build] target` in `.cargo/config.toml`) move the output
+to `target\x86_64-pc-windows-gnu\release\`, which breaks the launcher, the docs and the existing
+**Open with** registration.
+
+Some rustup versions reject a target tuple in the `channel` field with
+`error: target tuple in channel name`. rustup 1.29.0 accepts it. CI works around it by setting
+`RUSTUP_TOOLCHAIN`, which names the toolchain directly and stops rustup reading the file at all.
+
 ## PATH
 
 Any `cargo` invocation needs the MinGW `bin` directory on PATH, because several dependencies
@@ -47,9 +57,16 @@ cargo build -p viewer-app                              # debug, console attached
 cargo build --release -p viewer-app                    # release, console detached
 cargo build --release -p viewer-app --features console # release, console attached
 cargo test --workspace                                 # 323 tests
-cargo clippy --workspace --all-targets
-cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
 ```
+
+The last three are the gates `.github/workflows/ci.yml` runs on every push, and all three pass on
+`main`. `cargo fmt --all` fixes what the check reports.
+
+`EXTENSIONS` in `crates/app/src/shell.rs` carries `#[rustfmt::skip]`. Its grouping comments carry
+meaning, rustfmt reflows them into trailing comments that label the wrong line, and it never
+reaches a fixed point on that array, so `cargo fmt --check` failed immediately after `cargo fmt`.
 
 Release builds detach from the console so a double-click does not flash a terminal. The
 `identify`, `info`, `shot` and `open-with` subcommands print to the console, so a release build

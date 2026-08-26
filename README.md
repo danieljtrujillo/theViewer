@@ -284,10 +284,13 @@ State as of 2026-08-26.
 
 | Check | Result |
 |---|---|
+| `cargo fmt --all -- --check` | Clean |
+| `cargo clippy --workspace --all-targets -- -D warnings` | Clean. Two transitive dependencies carry a future-incompatibility notice. |
 | `cargo test --workspace` | 323 passing, 0 failing |
-| `cargo clippy --workspace --all-targets` | Clean. Two transitive dependencies carry a future-incompatibility notice. |
 | Release binary | 17,091,072 bytes |
 | `objdump -p` imports | 20 DLLs, every one a Windows system DLL |
+
+All three gates run on every push through [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 Not implemented, deliberately and knowingly: audio, `.sog`, Matroska spherical metadata, MV-HEVC
 spatial video, JPEG 2000, spherical harmonic evaluation above degree 0, a compute-shader splat
