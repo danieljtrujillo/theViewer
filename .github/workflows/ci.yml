@@ -9,10 +9,16 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Names the toolchain directly, which also stops rustup reading rust-toolchain.toml.
+  # The runner image ships a rustup old enough to reject a target tuple in the `channel`
+  # field, and that file has to keep one: the workspace needs a gnu-host toolchain, and
+  # a gnu host cannot be selected any other way without moving the build output out of
+  # target/release/ and breaking the launcher.
+  RUSTUP_TOOLCHAIN: stable-x86_64-pc-windows-gnu
 
 jobs:
   check:
-    name: clippy and tests
+    name: format, clippy and tests
     runs-on: windows-latest
 
     steps:
@@ -23,10 +29,10 @@ jobs:
       - name: Add MinGW to PATH
         run: Add-Content -Path $env:GITHUB_PATH -Value 'C:\msys64\mingw64\bin' -Encoding utf8
 
-      # Installs the channel and components pinned in rust-toolchain.toml.
-      - name: Install the pinned toolchain
+      - name: Install the toolchain
         run: |
-          rustup show
+          rustup self update
+          rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --component clippy --no-self-update
           rustc --version
           cargo --version
 
