@@ -18,11 +18,11 @@ env:
 
 jobs:
   check:
-    name: format, clippy and tests
+    name: format, clippy, tests and docs
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The workspace targets x86_64-pc-windows-gnu, which needs dlltool from MinGW
       # binutils. rustup does not ship it; the runner image carries MSYS2.
