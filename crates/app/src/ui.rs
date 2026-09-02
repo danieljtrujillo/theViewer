@@ -29,24 +29,54 @@ const VIEWPORT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb
 /// Height of the playback strip, in points.
 const BAR_HEIGHT: f32 = 34.0;
 
+/// The product name, as it appears to a person. The crates, the binary and the ProgId all still
+/// say `viewer` or `3DViewer`; those are identities other things already point at, and renaming
+/// them would break the shell registration for no visible gain.
+pub const PRODUCT: &str = "theViewer";
+pub const VENDOR: &str = "GANTASMO";
+
 pub fn run(initial: Option<PathBuf>) -> Result<(), eframe::Error> {
+    let mut viewport = egui::ViewportBuilder::default()
+        // Logical points, not pixels. A 150% display makes a 1280x720 physical panel report a
+        // 1280x720 logical desktop at 1920x1080, so anything taller than about 660 pushes the
+        // status bar off the bottom of the screen on a common laptop setup.
+        .with_inner_size([1040.0, 640.0])
+        .with_min_inner_size([420.0, 300.0])
+        .with_title(PRODUCT);
+    if let Some(icon) = window_icon() {
+        viewport = viewport.with_icon(icon);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            // Logical points, not pixels. A 150% display makes a 1280x720 physical panel report a
-            // 1280x720 logical desktop at 1920x1080, so anything taller than about 660 pushes the
-            // status bar off the bottom of the screen on a common laptop setup.
-            .with_inner_size([1040.0, 640.0])
-            .with_min_inner_size([420.0, 300.0])
-            .with_title("3D Viewer"),
+        viewport,
         renderer: eframe::Renderer::Wgpu,
         depth_buffer: 0,
         ..Default::default()
     };
     eframe::run_native(
-        "3D Viewer",
+        PRODUCT,
         options,
         Box::new(move |cc| Ok(Box::new(App::new(cc, initial)))),
     )
+}
+
+/// The title-bar and Alt-Tab icon.
+///
+/// Separate from the icon compiled into the executable by `build.rs`: that one is what Explorer
+/// and the taskbar read, this one is what the window itself carries. Both come from
+/// `assets/icon.ico` and `assets/icon.png`, which `tools/make-icons.mjs` writes from one source.
+///
+/// A failure here is cosmetic, so it returns `None` rather than stopping the app from opening.
+fn window_icon() -> Option<egui::IconData> {
+    let bytes = include_bytes!("../../../assets/icon.png");
+    let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).ok()?;
+    let image = image.into_rgba8();
+    let (width, height) = image.dimensions();
+    Some(egui::IconData {
+        rgba: image.into_raw(),
+        width,
+        height,
+    })
 }
 
 /// How the viewport is presented, and therefore what the mouse does in it.
@@ -590,7 +620,7 @@ impl App {
                 ui.set_max_width(430.0);
                 ui.add_space(4.0);
                 ui.label(
-                    "3D Viewer can add itself to the Windows \"Open with\" menu for the file \
+                    "theViewer can add itself to the Windows \"Open with\" menu for the file \
                      types it reads.",
                 );
                 ui.add_space(8.0);
@@ -1177,24 +1207,47 @@ fn stats(ui: &mut egui::Ui, s: &Summary, bytes: u64) {
     }
 }
 
+/// The window before anything is open: the wordmark, then the one instruction that matters.
+///
+/// The two names are sized rather than merely stacked. `theViewer` is the product and `by
+/// GANTASMO` is the attribution, and setting them at the same weight would make the reader work
+/// out which is which.
 fn empty_state(ui: &mut egui::Ui, size: egui::Vec2) {
     let centre = ui.max_rect().center();
-    let box_size = 44.0;
-    let colour = egui::Color32::from_rgb(96, 104, 114);
+    let painter = ui.painter();
+
+    let product = egui::Color32::from_rgb(226, 231, 238);
+    let vendor = egui::Color32::from_rgb(120, 129, 141);
+    let hint = egui::Color32::from_rgb(96, 104, 114);
+
     icon::folder(
-        ui.painter(),
+        painter,
         egui::Rect::from_center_size(
-            egui::pos2(centre.x, centre.y - 26.0),
-            egui::vec2(box_size, box_size * 0.82),
+            egui::pos2(centre.x, centre.y - 74.0),
+            egui::vec2(44.0, 44.0 * 0.82),
         ),
-        colour,
+        hint,
     );
-    ui.painter().text(
-        egui::pos2(centre.x, centre.y + 26.0),
+    painter.text(
+        egui::pos2(centre.x, centre.y - 14.0),
+        egui::Align2::CENTER_CENTER,
+        PRODUCT,
+        egui::FontId::proportional(30.0),
+        product,
+    );
+    painter.text(
+        egui::pos2(centre.x, centre.y + 14.0),
+        egui::Align2::CENTER_CENTER,
+        format!("by {VENDOR}"),
+        egui::FontId::proportional(12.0),
+        vendor,
+    );
+    painter.text(
+        egui::pos2(centre.x, centre.y + 52.0),
         egui::Align2::CENTER_CENTER,
         "Drop a file, or press Ctrl+O.",
         egui::FontId::proportional(13.0),
-        colour,
+        hint,
     );
     let _ = size;
 }

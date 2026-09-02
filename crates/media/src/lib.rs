@@ -246,13 +246,38 @@ impl StreamDecoder {
         key: bool,
         pts_us: u64,
     ) -> Result<Option<VideoFrame>, MediaError> {
+        self.decode_frame(data, key, pts_us, true)
+    }
+
+    /// Feed one coded frame that is only needed to keep the stream decodable, not to be shown.
+    ///
+    /// The returned frame carries an empty `rgba`. An inter-coded stream cannot be entered part
+    /// way through, so catching up to frame 29 of a group means decoding frames 0 to 28 as well;
+    /// converting each of those to RGBA and then dropping them costs more than the decode does,
+    /// and is pure waste. Anything reading `rgba` from this must check that it is not empty.
+    pub fn decode_without_pixels(
+        &mut self,
+        data: &[u8],
+        key: bool,
+        pts_us: u64,
+    ) -> Result<Option<VideoFrame>, MediaError> {
+        self.decode_frame(data, key, pts_us, false)
+    }
+
+    fn decode_frame(
+        &mut self,
+        data: &[u8],
+        key: bool,
+        pts_us: u64,
+        want_pixels: bool,
+    ) -> Result<Option<VideoFrame>, MediaError> {
         #[cfg(windows)]
         {
-            self.inner.decode(data, key, pts_us)
+            self.inner.decode(data, key, pts_us, want_pixels)
         }
         #[cfg(not(windows))]
         {
-            let _ = (data, key, pts_us);
+            let _ = (data, key, pts_us, want_pixels);
             Err(MediaError::Unsupported)
         }
     }

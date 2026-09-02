@@ -419,3 +419,109 @@ console.log("corpus written to", out);
   // one most likely to regress.
   writePng(join(out, "unlabelled-2to1.png"), W, H, pixel);
 }
+
+// ------------------------------------------------- points.xyz + survey.pts
+// Two ASCII point clouds, exercising the two column layouts that actually turn up and the
+// coordinate magnitude that breaks a naive reader.
+{
+  const N = 4000;
+  let xyz = "# a helix, x y z r g b\n";
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 12;
+    const r = 1 - i / N;
+    const x = Math.cos(t) * r;
+    const y = (i / N) * 2 - 1;
+    const z = Math.sin(t) * r;
+    const cr = Math.round(127 + 127 * Math.cos(t));
+    const cg = Math.round(127 + 127 * Math.sin(t * 0.5));
+    const cb = Math.round(255 * (i / N));
+    xyz += `${x.toFixed(5)} ${y.toFixed(5)} ${z.toFixed(5)} ${cr} ${cg} ${cb}\n`;
+  }
+  writeFileSync(join(out, "points.xyz"), xyz);
+
+  // Leica's layout, with a leading count and real UTM eastings. Nine significant digits with a
+  // centimetre step: the whole point is that f32 cannot hold this without recentring first.
+  const M = 2000;
+  let pts = `${M}\n`;
+  for (let i = 0; i < M; i++) {
+    const a = (i / M) * Math.PI * 2;
+    const e = 500000 + Math.cos(a) * 3;
+    const n = 4600000 + Math.sin(a) * 3;
+    const h = 100 + Math.sin(a * 4) * 0.5;
+    pts += `${e.toFixed(3)} ${n.toFixed(3)} ${h.toFixed(3)} -1500 ${(i * 7) % 256} ${(i * 13) % 256} ${(i * 29) % 256}\n`;
+  }
+  writeFileSync(join(out, "survey.pts"), pts);
+}
+
+// ------------------------------------------------- torus.off
+// Quad faces, so the fan triangulation is exercised rather than assumed.
+{
+  const RINGS = 40;
+  const SIDES = 20;
+  const R = 1.0;
+  const r = 0.35;
+  const verts = [];
+  for (let i = 0; i < RINGS; i++) {
+    const u = (i / RINGS) * Math.PI * 2;
+    for (let j = 0; j < SIDES; j++) {
+      const v = (j / SIDES) * Math.PI * 2;
+      verts.push([
+        (R + r * Math.cos(v)) * Math.cos(u),
+        r * Math.sin(v),
+        (R + r * Math.cos(v)) * Math.sin(u),
+      ]);
+    }
+  }
+  const faces = [];
+  for (let i = 0; i < RINGS; i++) {
+    for (let j = 0; j < SIDES; j++) {
+      const a = i * SIDES + j;
+      const b = ((i + 1) % RINGS) * SIDES + j;
+      const c = ((i + 1) % RINGS) * SIDES + ((j + 1) % SIDES);
+      const d = i * SIDES + ((j + 1) % SIDES);
+      faces.push([a, b, c, d]);
+    }
+  }
+  let off = `OFF\n# a torus, quad faces\n${verts.length} ${faces.length} 0\n`;
+  for (const p of verts) off += `${p[0].toFixed(6)} ${p[1].toFixed(6)} ${p[2].toFixed(6)}\n`;
+  for (const f of faces) off += `4 ${f.join(" ")}\n`;
+  writeFileSync(join(out, "torus.off"), off);
+}
+
+// ------------------------------------------------- volume.mhd + volume.raw, volume.mha
+// A 64-cubed scalar field, written twice: split with a raw sidecar, and inline and compressed.
+{
+  const D = 64;
+  const voxels = Buffer.alloc(D * D * D * 2);
+  for (let z = 0; z < D; z++) {
+    for (let y = 0; y < D; y++) {
+      for (let x = 0; x < D; x++) {
+        const dx = x / D - 0.5;
+        const dy = y / D - 0.5;
+        const dz = z / D - 0.5;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        // A shell, so a raymarch has something with an inside and an outside.
+        const shell = Math.max(0, 1 - Math.abs(d - 0.32) * 12);
+        const value = Math.round(shell * 3000) - 1000;
+        voxels.writeInt16LE(value, ((z * D + y) * D + x) * 2);
+      }
+    }
+  }
+
+  const header = (dataFile, compressed, size) =>
+    `ObjectType = Image\nNDims = 3\nBinaryData = True\n` +
+    `BinaryDataByteOrderMSB = False\nCompressedData = ${compressed ? "True" : "False"}\n` +
+    (compressed ? `CompressedDataSize = ${size}\n` : "") +
+    `TransformMatrix = 1 0 0 0 1 0 0 0 1\nOffset = 0 0 0\n` +
+    `ElementSpacing = 0.5 0.5 1.0\nDimSize = ${D} ${D} ${D}\n` +
+    `ElementType = MET_SHORT\nElementDataFile = ${dataFile}\n`;
+
+  writeFileSync(join(out, "volume.raw"), voxels);
+  writeFileSync(join(out, "volume.mhd"), header("volume.raw", false, 0));
+
+  const packed = zlibSync(voxels);
+  writeFileSync(
+    join(out, "volume.mha"),
+    Buffer.concat([Buffer.from(header("LOCAL", true, packed.length), "ascii"), packed]),
+  );
+}

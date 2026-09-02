@@ -27,7 +27,7 @@ The viewer ships first.
 
 ---
 
-## What is built, as of 2026-08-26
+## What is built, as of 2026-08-27
 
 This document remains a survey. [HANDOFF.md](../HANDOFF.md) is the status; the short version is
 that these sections are implemented and verified against real files:
@@ -35,16 +35,18 @@ that these sections are implemented and verified against real files:
 | Section | State |
 |---|---|
 | §A.1 parity set | glTF/GLB, OBJ, PLY (all four variants), STL, FBX |
+| §A.3 interchange | 3MF, STEP, OpenUSD, Geomview OFF |
 | §C splats | SPZ v1 to v4, INRIA and SuperSplat PLY. Degree-0 colour only |
 | §E.1 `.ares` | Container, meshopt geometry, VP9/AV1 texture track. Verified on real captures |
 | §E.1 `.4ds` | Container read and reported. Blocks blocked, as tiered |
 | §E.4 Depthkit CPP | Sidecar, layout detection, hue depth decode, unprojection |
-| §F volumes | DICOM series, NIfTI, NRRD |
+| §B point clouds | PCD, LAS, LAZ, E57, and the ASCII `.xyz` / `.pts` / `.asc` family |
+| §F volumes | DICOM series, NIfTI, NRRD, MetaImage |
 | §H images | PNG, JPEG, GIF, BMP, WebP, TIFF, TGA, QOI, ICO, DDS, PNM, Radiance, OpenEXR |
 | §K spatial media | 360 photos and video, equirectangular, mono and stereo |
 | Video generally | Whatever Windows Media Foundation can decode on the machine |
 
-Two findings from building §E and §K are worth folding back into the survey:
+Three findings are worth folding back into the survey:
 
 - **The `.mp4` ambiguity resolves in two different places.** Spherical metadata is *in* the file,
   so the importer reads the boxes. Depthkit is *beside* it, so only something holding a path can
@@ -55,6 +57,11 @@ Two findings from building §E and §K are worth folding back into the survey:
   day's work against a real capture set and produced a moving surface. The three decode gates that
   make it work (saturation, hue wrap, grazing triangles) are not in any published spec and were
   each found the hard way; they are recorded in `crates/formats/src/depthkit.rs`.
+- **A format with no header still needs a name to be claimed.** `.xyz`, `.pts` and `.asc` are rows
+  of numbers and nothing else, which is the same evidential position `.splat` is in. The rule that
+  fell out of it: content shape alone never produces a verdict, it only confirms one the extension
+  proposed. `.asc` is the case that proves it, being an ESRI ASCII grid as often as a point list,
+  so it is not in the extension table at all and only ever arrives through the content test.
 
 ---
 

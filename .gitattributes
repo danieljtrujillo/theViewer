@@ -43,6 +43,8 @@
 *.dcm   binary
 *.nii   binary
 *.nrrd  binary
+*.mha   binary
+*.raw   binary
 *.mp4   binary
 *.mov   binary
 *.mkv   binary

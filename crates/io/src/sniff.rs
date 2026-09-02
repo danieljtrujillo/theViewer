@@ -181,12 +181,21 @@ pub enum FormatId {
     /// without the licensed `BridgeCodec4DS.dll`.
     FourDs,
 
+    /// Geomview OFF, and the `C`/`N`/`4`/`ST` prefixed variants that add colour, normals, a fourth
+    /// coordinate or texture coordinates.
+    Off,
+
     // --- T0 points and volumes ---
     Pcd,
+    /// Whitespace-separated ASCII points: `.xyz`, `.pts`, `.asc`. Every scanner and every
+    /// photogrammetry tool exports one, and none of them agree on the column layout.
+    Xyz,
     Las,
     E57,
     Nrrd,
     Nifti,
+    /// ITK MetaImage. `.mha` carries its voxels inline, `.mhd` names a separate raw file.
+    MetaImage,
     Dicom,
 
     // --- Recognized but not yet handled. Worth identifying anyway: naming a format the app
@@ -240,7 +249,10 @@ impl FormatId {
             FormatId::Ares => "ARES volumetric",
             FormatId::Depthkit => "Depthkit RGBD video",
             FormatId::FourDs => "4DViews HOLOSYS",
+            FormatId::Off => "OFF mesh",
             FormatId::Pcd => "PCD point cloud",
+            FormatId::Xyz => "ASCII point cloud",
+            FormatId::MetaImage => "MetaImage volume",
             FormatId::Las => "LAS / LAZ",
             FormatId::E57 => "ASTM E57",
             FormatId::Nrrd => "NRRD volume",
@@ -602,11 +614,45 @@ pub fn sniff(header: &[u8], file_len: u64, name: Option<&str>) -> Vec<Candidate>
         ));
     }
 
+    // ---- ASCII signatures. Text, but no less a magic number for it ----
+
+    // These read the *ASCII prefix* rather than `leading_text`, which requires the whole window to
+    // decode as UTF-8. A `.mha` is a text header followed immediately by binary voxels, so the
+    // window never decodes and the header would never be seen. Same shape of problem as PLY,
+    // which truncates at `end_header` for the same reason.
+    {
+        let text = ascii_prefix(header);
+        if let Some(variant) = off_keyword(text) {
+            out.push(Candidate::new(FormatId::Off, Confidence::Magic, variant));
+        }
+        // MetaImage is a `key = value` header. Two required fields together are unambiguous;
+        // either alone is a phrase that could appear in any text file.
+        if has_field(text, "ObjectType") && has_field(text, "NDims") {
+            out.push(Candidate::new(
+                FormatId::MetaImage,
+                Confidence::Magic,
+                "MetaImage header declares ObjectType and NDims",
+            ));
+        }
+    }
+
     // ---- Text heuristics, last, and only when nothing structural matched ----
 
     if out.is_empty() {
         if let Some(text) = leading_text(header) {
             let lower = text.to_ascii_lowercase();
+
+            // Rows of bare numbers, which is the entire specification of `.xyz`. Gated on the
+            // name for the same reason `.splat` is: with no header, the shape of the data is the
+            // only evidence, and it is not enough to claim a format on its own.
+            if matches!(ext, Some("xyz") | Some("pts") | Some("asc")) && looks_like_xyz(text) {
+                out.push(Candidate::new(
+                    FormatId::Xyz,
+                    Confidence::Heuristic,
+                    "rows of three or more numbers; the format carries no header",
+                ));
+            }
+
             if lower.starts_with("solid") {
                 out.push(Candidate::new(
                     FormatId::StlAscii,
@@ -860,6 +906,89 @@ fn leading_text(header: &[u8]) -> Option<&str> {
     std::str::from_utf8(slice).ok()
 }
 
+/// The longest leading run of bytes that could be part of a text header.
+///
+/// Printable ASCII plus tab, newline and carriage return. Anything else ends it. This is what
+/// makes a text header readable in a file whose body is binary: `leading_text` asks the whole
+/// window to decode and gives up on the first stray byte, which for a `.mha` is the first voxel.
+fn ascii_prefix(header: &[u8]) -> &str {
+    let end = header
+        .iter()
+        .position(|b| !(matches!(b, 0x09 | 0x0A | 0x0D) || (0x20..0x7F).contains(b)))
+        .unwrap_or(header.len());
+    // Every byte in the run is ASCII, so this cannot fail.
+    std::str::from_utf8(&header[..end]).unwrap_or("")
+}
+
+/// The OFF keyword on the first non-comment line, if there is one.
+///
+/// The prefixes stack: `C` adds vertex colour, `N` normals, `4` a fourth coordinate, `ST` texture
+/// coordinates. `CNOFF` and `NCOFF` are both written in the wild.
+fn off_keyword(text: &str) -> Option<&'static str> {
+    let first = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && !l.starts_with('#'))?;
+    let word = first.split_ascii_whitespace().next()?;
+    Some(match word {
+        "OFF" => "OFF keyword",
+        "COFF" => "OFF keyword, with vertex colour",
+        "NOFF" => "OFF keyword, with vertex normals",
+        "CNOFF" | "NCOFF" => "OFF keyword, with vertex colour and normals",
+        "STOFF" => "OFF keyword, with texture coordinates",
+        "4OFF" => "OFF keyword, four-component positions",
+        _ => return None,
+    })
+}
+
+/// Whether a `key = value` header declares `key`, case-insensitively and whatever the spacing.
+fn has_field(text: &str, key: &str) -> bool {
+    text.lines().take(48).any(|line| {
+        let mut parts = line.splitn(2, '=');
+        matches!(parts.next(), Some(name) if name.trim().eq_ignore_ascii_case(key))
+            && parts.next().is_some()
+    })
+}
+
+/// Whether the leading lines are rows of at least three numbers.
+///
+/// Requires several agreeing rows rather than one, because a single line of numbers turns up in
+/// half the text formats in existence. An ESRI ASCII grid, which also uses `.asc`, fails here: its
+/// header lines are `ncols 400` and the like, which is a word followed by one number.
+fn looks_like_xyz(text: &str) -> bool {
+    let mut rows = 0usize;
+    let mut columns = 0usize;
+    for line in text.lines().take(32) {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
+            continue;
+        }
+        let fields: Vec<&str> = line
+            .split(|c: char| c == ',' || c.is_ascii_whitespace())
+            .filter(|f| !f.is_empty())
+            .collect();
+        // A leading bare count is how most `.pts` files start. One is allowed; a second means
+        // this is not a point list.
+        if fields.len() == 1 && rows == 0 && fields[0].parse::<u64>().is_ok() {
+            continue;
+        }
+        if fields.len() < 3 || !fields.iter().all(|f| f.parse::<f64>().is_ok()) {
+            return false;
+        }
+        if columns == 0 {
+            columns = fields.len();
+        } else if columns != fields.len() {
+            return false;
+        }
+        rows += 1;
+        if rows >= 4 {
+            return true;
+        }
+    }
+    // A short file still counts, as long as every line agreed.
+    rows >= 2
+}
+
 fn looks_like_obj(lower: &str) -> bool {
     let mut vertices = 0usize;
     let mut directives = 0usize;
@@ -893,7 +1022,12 @@ fn format_for_extension(ext: &str) -> Option<FormatId> {
         // offers, so a file that fails the stride check is not a splat file no matter what it is
         // called, and the name must not resurrect a verdict the arithmetic already rejected.
         "sog" => FormatId::Sog,
+        "off" => FormatId::Off,
         "pcd" => FormatId::Pcd,
+        // `.asc` is deliberately absent. It is an ESRI ASCII grid as often as it is a point list,
+        // and only the content can tell them apart, so a bare name is not enough to claim it.
+        "xyz" | "pts" => FormatId::Xyz,
+        "mhd" | "mha" => FormatId::MetaImage,
         "las" | "laz" | "copc.laz" => FormatId::Las,
         "e57" => FormatId::E57,
         "nrrd" => FormatId::Nrrd,
@@ -1355,5 +1489,120 @@ mod tests {
         assert!(FormatId::Ares.is_supported());
         assert!(FormatId::Step.is_supported());
         assert!(FormatId::Spz(SpzEncoding::PlaintextV4).is_supported());
+    }
+
+    #[test]
+    fn every_off_keyword_is_a_magic_number() {
+        for keyword in ["OFF", "COFF", "NOFF", "CNOFF", "NCOFF", "STOFF", "4OFF"] {
+            let src = format!("{keyword}\n8 6 12\n0 0 0\n");
+            let c = top(src.as_bytes(), src.len() as u64, Some("mesh.off"));
+            assert_eq!(c.format, FormatId::Off, "{keyword}");
+            assert_eq!(c.confidence, Confidence::Magic, "{keyword}");
+        }
+    }
+
+    #[test]
+    fn a_leading_comment_does_not_hide_the_off_keyword() {
+        let src = b"# written by something\nOFF\n8 6 12\n";
+        assert_eq!(top(src, src.len() as u64, None).format, FormatId::Off);
+    }
+
+    #[test]
+    fn a_word_that_merely_ends_in_off_is_not_an_off_file() {
+        let src = b"TAKEOFF\n8 6 12\n";
+        assert_ne!(top(src, src.len() as u64, None).format, FormatId::Off);
+    }
+
+    #[test]
+    fn metaimage_needs_both_of_its_required_fields() {
+        let both = b"ObjectType = Image\nNDims = 3\nDimSize = 4 4 4\nElementDataFile = LOCAL\n";
+        let c = top(both, both.len() as u64, Some("head.mhd"));
+        assert_eq!(c.format, FormatId::MetaImage);
+        assert_eq!(c.confidence, Confidence::Magic);
+
+        // NDims alone is a phrase, not a header.
+        let one = b"NDims = 3\nsomething else entirely\n";
+        assert_ne!(top(one, one.len() as u64, None).format, FormatId::MetaImage);
+    }
+
+    #[test]
+    fn an_mha_carrying_binary_voxels_after_its_header_still_identifies() {
+        // The body of a real `.mha` is voxels, frequently zlib-compressed, and is not valid UTF-8.
+        // Asking the whole header window to decode before looking for the fields loses them, and
+        // the file drops to an extension-only guess. Asserting the *confidence* is the point of
+        // this test: the format alone would pass on the extension fallback.
+        let mut src = b"ObjectType = Image\nNDims = 3\nDimSize = 2 2 2\n\
+                        ElementType = MET_SHORT\nElementDataFile = LOCAL\n"
+            .to_vec();
+        src.extend_from_slice(&[0xFF, 0x80, 0x00, 0xC0, 0xDE, 0x7F, 0x01, 0x02]);
+        let c = top(&src, src.len() as u64, Some("scan.mha"));
+        assert_eq!(c.format, FormatId::MetaImage);
+        assert_eq!(c.confidence, Confidence::Magic);
+
+        // And with no name at all, so nothing but the header can be doing the work.
+        assert_eq!(
+            top(&src, src.len() as u64, None).format,
+            FormatId::MetaImage
+        );
+    }
+
+    #[test]
+    fn the_ascii_prefix_stops_at_the_first_byte_that_is_not_header_text() {
+        assert_eq!(ascii_prefix(b"OFF\n8 6 12\n"), "OFF\n8 6 12\n");
+        assert_eq!(ascii_prefix(b"header\n\xFF\xFEbinary"), "header\n");
+        assert_eq!(ascii_prefix(b"\x00leading nul"), "");
+        assert_eq!(ascii_prefix(b""), "");
+    }
+
+    #[test]
+    fn rows_of_numbers_are_a_point_cloud_only_when_the_name_agrees() {
+        let src = b"1.0 2.0 3.0\n4.0 5.0 6.0\n7.0 8.0 9.0\n10.0 11.0 12.0\n";
+        assert_eq!(
+            top(src, src.len() as u64, Some("scan.xyz")).format,
+            FormatId::Xyz
+        );
+        assert_eq!(
+            top(src, src.len() as u64, Some("scan.pts")).format,
+            FormatId::Xyz
+        );
+        // The same bytes under a name that says nothing stay unidentified: with no header, the
+        // shape of the data is the only evidence and it is not enough on its own.
+        assert_eq!(top(src, src.len() as u64, None).format, FormatId::Unknown);
+    }
+
+    #[test]
+    fn a_leading_point_count_does_not_stop_a_pts_file_identifying() {
+        let src = b"4\n1 2 3\n4 5 6\n7 8 9\n10 11 12\n";
+        assert_eq!(
+            top(src, src.len() as u64, Some("scan.pts")).format,
+            FormatId::Xyz
+        );
+    }
+
+    #[test]
+    fn an_esri_ascii_grid_is_not_mistaken_for_a_point_cloud() {
+        // `.asc` is both, and only the content separates them. A grid header is a word and one
+        // number per line, which the row test rejects.
+        let src = b"ncols 4\nnrows 4\nxllcorner 0.0\nyllcorner 0.0\ncellsize 1.0\n\
+                    NODATA_value -9999\n1 2 3 4\n";
+        assert_ne!(
+            top(src, src.len() as u64, Some("dem.asc")).format,
+            FormatId::Xyz
+        );
+    }
+
+    #[test]
+    fn asc_is_not_claimed_from_the_name_alone() {
+        // Unlike `.xyz` and `.pts`, the extension is too widely shared to be a fallback.
+        assert_eq!(format_for_extension("xyz"), Some(FormatId::Xyz));
+        assert_eq!(format_for_extension("pts"), Some(FormatId::Xyz));
+        assert_eq!(format_for_extension("asc"), None);
+    }
+
+    #[test]
+    fn the_new_formats_all_have_importers() {
+        assert!(FormatId::Off.is_supported());
+        assert!(FormatId::Xyz.is_supported());
+        assert!(FormatId::MetaImage.is_supported());
     }
 }

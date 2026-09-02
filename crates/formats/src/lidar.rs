@@ -150,7 +150,6 @@ fn assemble(accumulator: Accumulator, format: FormatId, label: &str) -> Result<S
     let mut scene = Scene::new();
     scene.push_root(Node::with_payload("points", Payload::PointCloud(cloud)));
     scene.set_meta("format", label);
-    scene.set_meta("points", kept.to_string());
     if kept < seen {
         // Silent truncation reads as "this is the whole file", which it is not.
         scene.set_meta("truncated", format!("showing {kept} of {seen} points"));

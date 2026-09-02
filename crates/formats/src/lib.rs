@@ -25,9 +25,11 @@ pub mod gltf_import;
 pub mod isobmff;
 pub mod lidar;
 pub mod meshopt;
+pub mod metaimage;
 pub mod movie;
 pub mod mtl;
 pub mod obj;
+pub mod off;
 pub mod pcd;
 pub mod picture;
 pub mod ply;
@@ -40,6 +42,7 @@ pub mod stl;
 pub mod threemf;
 pub mod usd;
 pub mod volume;
+pub mod xyz;
 
 use viewer_io::FormatId;
 use viewer_scene::{Image, MeshFrame, Scene, Timeline};
@@ -159,6 +162,8 @@ pub fn open(
         FormatId::Nrrd => still(volume::import_nrrd(bytes)),
         FormatId::Splat => still(splat::import(bytes)),
         FormatId::Pcd => still(pcd::import(bytes)),
+        FormatId::Off => still(off::import(bytes)),
+        FormatId::Xyz => still(xyz::import(bytes, path)),
         FormatId::ThreeMf => still(threemf::import(bytes)),
         FormatId::Step => still(step::import(bytes)),
         // USD composes layers, references and variants, so it needs the file on disk and its
@@ -171,6 +176,13 @@ pub fn open(
         // both want to seek, and a county LiDAR tile has no business being resident.
         FormatId::Las => match path {
             Some(p) => still(lidar::import_las(p)),
+            None => Err(ImportError::NeedsPath(format.clone())),
+        },
+        // MetaImage splits into a header and a raw file more often than not, and even the
+        // single-file form is read from disk rather than from the slice, so the two paths stay
+        // one path.
+        FormatId::MetaImage => match path {
+            Some(p) => still(metaimage::import(p)),
             None => Err(ImportError::NeedsPath(format.clone())),
         },
         FormatId::E57 => match path {
