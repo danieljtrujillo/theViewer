@@ -241,8 +241,24 @@ pub fn import(path: &Path) -> Result<Scene, ImportError> {
         Some(name) => {
             let sibling = resolve(path, name)
                 .ok_or_else(|| malformed(format!("{name} is not beside the header")))?;
-            let raw = std::fs::read(&sibling)
+            let file = std::fs::File::open(&sibling)
                 .map_err(|e| malformed(format!("{} could not be read: {e}", sibling.display())))?;
+            let raw = if header.compressed {
+                let mut out = Vec::with_capacity(declared_bytes.min(16 * 1024 * 1024));
+                flate2::read::ZlibDecoder::new(file)
+                    .take(declared_bytes as u64 + 1)
+                    .read_to_end(&mut out)
+                    .map_err(|e| malformed(format!("the zlib stream did not decompress: {e}")))?;
+                out
+            } else {
+                let mut raw = Vec::new();
+                file.take(declared_bytes as u64 + 1)
+                    .read_to_end(&mut raw)
+                    .map_err(|e| {
+                        malformed(format!("{} could not be read: {e}", sibling.display()))
+                    })?;
+                raw
+            };
             (
                 raw,
                 sibling
@@ -258,7 +274,7 @@ pub fn import(path: &Path) -> Result<Scene, ImportError> {
         ),
     };
 
-    let raw = if header.compressed {
+    let raw = if header.compressed && header.data_file.is_none() {
         // Bounded by what the dimensions say the volume needs, plus one byte so a stream that
         // carries more than it should is detectable rather than silently truncated. An unbounded
         // `read_to_end` here would let a few kilobytes of zlib expand until the process dies,

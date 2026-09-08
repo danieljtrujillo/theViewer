@@ -76,6 +76,7 @@ function decodePng(buf) {
 
   const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[colourType];
   if (!channels) throw new Error(`colour type ${colourType} is not supported`);
+  if (colourType === 3 && !palette) throw new Error("indexed-colour PNG is missing a PLTE chunk");
 
   const raw = inflateSync(Buffer.concat(idat));
   const stride = width * channels;

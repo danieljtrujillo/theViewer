@@ -355,7 +355,9 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
         );
     }
 
-    let index_buffer = if vertex_count <= u16::MAX as usize {
+    let index_buffer = if indices.is_empty() {
+        Indices::None
+    } else if vertex_count <= u16::MAX as usize {
         Indices::U16(indices.iter().map(|i| *i as u16).collect())
     } else {
         Indices::U32(indices.clone())
@@ -413,6 +415,13 @@ mod tests {
         let m = mesh(&scene);
         assert_eq!(m.vertex_count(), 4);
         assert_eq!(m.triangle_count(), 2);
+    }
+
+    #[test]
+    fn a_faceless_mesh_has_no_index_buffer() {
+        let scene = import(b"OFF\n3 0 0\n0 0 0\n1 0 0\n0 1 0\n").unwrap();
+        let m = mesh(&scene);
+        assert!(matches!(m.indices, Indices::None));
     }
 
     #[test]

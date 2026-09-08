@@ -930,6 +930,11 @@ fn off_keyword(text: &str) -> Option<&'static str> {
         .map(str::trim)
         .find(|l| !l.is_empty() && !l.starts_with('#'))?;
     let word = first.split_ascii_whitespace().next()?;
+    let prefix = word.strip_suffix("OFF")?;
+    let prefix = prefix.strip_prefix("ST").unwrap_or(prefix);
+    if !prefix.is_empty() && !prefix.chars().all(|c| matches!(c, 'C' | 'N' | '4' | 'n')) {
+        return None;
+    }
     Some(match word {
         "OFF" => "OFF keyword",
         "COFF" => "OFF keyword, with vertex colour",
@@ -937,7 +942,7 @@ fn off_keyword(text: &str) -> Option<&'static str> {
         "CNOFF" | "NCOFF" => "OFF keyword, with vertex colour and normals",
         "STOFF" => "OFF keyword, with texture coordinates",
         "4OFF" => "OFF keyword, four-component positions",
-        _ => return None,
+        _ => "OFF keyword, with prefixed attributes",
     })
 }
 
@@ -1493,7 +1498,9 @@ mod tests {
 
     #[test]
     fn every_off_keyword_is_a_magic_number() {
-        for keyword in ["OFF", "COFF", "NOFF", "CNOFF", "NCOFF", "STOFF", "4OFF"] {
+        for keyword in [
+            "OFF", "COFF", "NOFF", "CNOFF", "NCOFF", "STOFF", "4OFF", "C4OFF", "N4OFF", "nOFF",
+        ] {
             let src = format!("{keyword}\n8 6 12\n0 0 0\n");
             let c = top(src.as_bytes(), src.len() as u64, Some("mesh.off"));
             assert_eq!(c.format, FormatId::Off, "{keyword}");
