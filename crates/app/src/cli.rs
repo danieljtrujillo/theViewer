@@ -8,7 +8,7 @@ use viewer_scene::Timeline;
 
 pub fn usage() {
     eprintln!(
-        "viewer {}\n\
+        "theViewer {} by GANTASMO\n\
          \n\
          viewer                           open the window\n\
          viewer <path>                    open the window on a file\n\

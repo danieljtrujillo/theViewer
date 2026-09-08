@@ -30,7 +30,7 @@ For why the app is built the way it is, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Four ways in.
 
-The launcher `Open 3D Viewer.vbs` at the repository root rebuilds the viewer when the sources have
+The launcher `Open theViewer.vbs` at the repository root rebuilds the viewer when the sources have
 changed and then opens the window. Build output goes to `tools/build.log`. A file path passed to
 the launcher is forwarded to the viewer.
 
@@ -119,7 +119,11 @@ so the grab point tracks the cursor.
 ## 5. Meshes and scenes
 
 Working formats: glTF 2.0 and 2.1 in both binary and JSON spellings, Wavefront OBJ, PLY, STL in
-both binary and ASCII, FBX, 3MF, STEP, and OpenUSD.
+both binary and ASCII, FBX, 3MF, STEP, OpenUSD, and Geomview OFF.
+
+OFF reads the `C`, `N`, `4` and `ST` keyword prefixes, so vertex colour and normals arrive when
+the file carries them. Polygon faces are fanned into triangles from their first vertex, which is
+correct for the convex faces the format is used for.
 
 Meshes render textured and unlit when a base colour texture is present, and shaded when it is not.
 Backface culling is off by default, because scans and per-frame reconstructions carry inconsistent
@@ -138,7 +142,15 @@ read.
 ## 6. Point clouds and LiDAR
 
 Working formats: PLY point clouds, PCD in ascii, binary and binary_compressed spellings, LAS, LAZ,
-and E57.
+E57, and the ASCII point clouds `.xyz`, `.pts` and `.asc`.
+
+The ASCII formats have no specification, so the column layout is inferred. Three columns are
+positions, four adds intensity, seven is the Leica layout of `x y z intensity r g b`, and nine
+adds normals. Six columns is the ambiguous case and the values decide: whole numbers between 0 and
+255 are colour, and anything fractional inside the unit range is a normal. A leading line carrying
+only a count is read as a header rather than as a point, and commas separate as well as spaces.
+Rows that will not parse are dropped and counted in the details panel, and a file that is mostly
+unparseable is refused.
 
 Points render as screen-space sprites. A size slider appears in the toolbar for any file that
 carries points, running from 1 to 12 pixels.
@@ -151,7 +163,8 @@ LAS colour is nominally 16-bit, and about half the writers in circulation store 
 without scaling them. The importer decides the shift from the values themselves rather than
 applying it unconditionally, which would render those files almost black.
 
-LAS, LAZ and E57 files are capped at 20,000,000 points. PLY and PCD are read in full.
+LAS, LAZ, E57 and the ASCII formats are capped at 20,000,000 points, and the details panel says so
+when a file was truncated. PLY and PCD are read in full.
 
 ## 7. Gaussian splats
 
@@ -174,7 +187,14 @@ The depth sort is a CPU radix sort. It is the budget on this path, not decoding.
 
 ## 8. Volumes
 
-Working formats: DICOM series, NIfTI including gzip, and NRRD.
+Working formats: DICOM series, NIfTI including gzip, NRRD, and MetaImage.
+
+MetaImage comes in two shapes. A `.mha` ends its header with `ElementDataFile = LOCAL` and carries
+the voxels inline; a `.mhd` names a separate raw file beside it. Both are read, with or without
+zlib compression, in either byte order. Signed bytes widen to 16 bits and the 32-bit integers and
+doubles narrow to `f32`, because those are the four types the grid stores. A data path that climbs
+out of the directory holding the header is refused: that path comes out of the file, and a viewer
+has no business following it elsewhere.
 
 Opening one slice of a DICOM series stacks every slice in the folder into one volume. Slice order
 comes from `ImagePositionPatient` projected onto the slice normal rather than from

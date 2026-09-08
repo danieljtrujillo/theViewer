@@ -121,7 +121,6 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
         }),
     ));
     scene.set_meta("format", "splat (antimatter15)");
-    scene.set_meta("splats", count.to_string());
     scene.set_meta("spherical harmonics", "degree 0 only, baked by the format");
     Ok(scene)
 }

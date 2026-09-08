@@ -1,4 +1,4 @@
-//! Putting "3D Viewer" in the Windows **Open with** menu, with the user's permission.
+//! Putting theViewer in the Windows **Open with** menu, with the user's permission.
 //!
 //! Everything written here lives under `HKEY_CURRENT_USER`. That is a deliberate limit, not a
 //! shortcut: per-user registration needs no elevation, cannot affect anyone else on the machine,
@@ -32,7 +32,15 @@ use windows::Win32::System::Registry::{
 /// The ProgId. Vendor-qualified and versioned, as the naming convention requires, so it cannot
 /// collide with another application's.
 pub const PROG_ID: &str = "GANTASMO.3DViewer.1";
-pub const APP_NAME: &str = "3D Viewer";
+
+/// The name Windows shows: the Open with entry, the Default Apps page, the file-properties
+/// description.
+pub const APP_NAME: &str = "theViewer";
+
+/// What `APP_NAME` used to be. Builds before the rename wrote a `RegisteredApplications` value
+/// under this name, and nothing removes it once the constant changes, so both are cleaned up.
+const LEGACY_APP_NAME: &str = "3D Viewer";
+
 const APP_KEY: &str = r"Software\GANTASMO\3D Viewer";
 const REGISTERED_APPS: &str = r"Software\RegisteredApplications";
 
@@ -72,7 +80,20 @@ pub const EXTENSIONS: &[&str] = &[
 /// something a person can do without regedit.
 pub fn state_path() -> Option<PathBuf> {
     let base = std::env::var_os("LOCALAPPDATA")?;
-    Some(PathBuf::from(base).join("3D Viewer").join("shell-prompt"))
+    Some(PathBuf::from(base).join(APP_NAME).join("shell-prompt"))
+}
+
+/// Where builds before the rename kept the same flag.
+///
+/// Read but never written. Someone who already answered "never ask again" must not be asked
+/// again just because the folder moved.
+fn legacy_state_path() -> Option<PathBuf> {
+    let base = std::env::var_os("LOCALAPPDATA")?;
+    Some(
+        PathBuf::from(base)
+            .join(LEGACY_APP_NAME)
+            .join("shell-prompt"),
+    )
 }
 
 /// What the user has already told us about shell integration.
@@ -92,11 +113,10 @@ pub fn consent() -> Consent {
     let Some(path) = state_path() else {
         return Consent::Refused;
     };
-    match std::fs::read_to_string(&path)
-        .ok()
-        .as_deref()
-        .map(str::trim)
-    {
+    let recorded = std::fs::read_to_string(&path)
+        .or_else(|_| std::fs::read_to_string(legacy_state_path().unwrap_or_default()))
+        .ok();
+    match recorded.as_deref().map(str::trim) {
         Some("granted") => Consent::Granted,
         Some("refused") => Consent::Refused,
         Some("deferred") => Consent::Deferred,
@@ -229,6 +249,7 @@ pub fn register(exe: &Path) -> Result<(), String> {
         APP_NAME,
         &format!(r"{APP_KEY}\Capabilities"),
     )?;
+    delete_value(REGISTERED_APPS, LEGACY_APP_NAME);
 
     notify_shell();
     Ok(())
@@ -255,6 +276,7 @@ pub fn unregister() -> Result<(), String> {
     delete_tree(&format!(r"{classes}\{PROG_ID}"));
     delete_tree(&format!(r"{classes}\Applications\{exe_name}"));
     delete_value(REGISTERED_APPS, APP_NAME);
+    delete_value(REGISTERED_APPS, LEGACY_APP_NAME);
     delete_tree(APP_KEY);
 
     notify_shell();

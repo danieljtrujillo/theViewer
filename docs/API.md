@@ -35,12 +35,12 @@ that must never churn or drag a version conflict into the tree.
 
 | Crate | Lines | Tests | Dependencies |
 |---|---|---|---|
-| `viewer-scene` | 1,470 | 25 | none |
-| `viewer-io` | 1,435 | 36 | `memmap2` |
-| `viewer-media` | 1,559 | 17 | `windows` (Windows only) |
-| `viewer-formats` | 11,557 | 199 | 20 external crates, listed in `crates/formats/Cargo.toml` |
-| `viewer-render` | 2,632 Rust, 539 WGSL | 32 | `wgpu`, `glam`, `bytemuck` |
-| `viewer-app` | 2,701 | 14 | `eframe`, `rfd`, `wgpu`, `pollster`, `image`, `windows` |
+| `viewer-scene` | 1,476 | 25 | none |
+| `viewer-io` | 1,666 | 46 | `memmap2` |
+| `viewer-media` | 1,560 | 17 | `windows` (Windows only) |
+| `viewer-formats` | 12,989 | 231 | 20 external crates, listed in `crates/formats/Cargo.toml` |
+| `viewer-render` | 2,649 Rust, 539 WGSL | 32 | `wgpu`, `glam`, `bytemuck` |
+| `viewer-app` | 2,777 | 36 | `eframe`, `rfd`, `wgpu`, `pollster`, `image`, `windows` |
 
 ---
 
@@ -544,7 +544,7 @@ pub enum FormatId {
     Step,
     Image(ImageKind), Video(VideoKind),
     Ares, Depthkit, FourDs,
-    Pcd, Las, E57, Nrrd, Nifti, Dicom,
+    Off, Pcd, Xyz, Las, E57, Nrrd, Nifti, MetaImage, Dicom,
     Usda, Usdc, Usdz, Zip, Gzip, Isobmff,
     Unknown,
 }
@@ -682,6 +682,9 @@ untrusted file is the failure this variant exists to prevent.
 | `spz` | `import(bytes, SpzEncoding) -> Scene` | SPZ v1 to v4. |
 | `splat` | `import(bytes) -> Scene`, `STRIDE = 32` | The antimatter15 `.splat` layout. |
 | `pcd` | `import(bytes)`, `parse_header(bytes)`, `decompress(body)` | ascii, binary, binary_compressed. |
+| `off` | `import(bytes) -> Scene`, `parse_keyword(word) -> Header` | OFF and the `C`, `N`, `4`, `ST` variants. Polygons fanned. |
+| `xyz` | `import(bytes, path) -> Scene`, `layout_for(columns, samples) -> Layout` | `.xyz`, `.pts`, `.asc`. Column layout inferred from the values. |
+| `metaimage` | `import(path) -> Scene`, `parse_header(bytes) -> Header` | `.mhd` and `.mha`, plain or zlib. Needs a path for the split form. |
 | `lidar` | `import_las(path)`, `import_e57(path)`, `MAX_POINTS = 20_000_000` | LAS, LAZ, E57. |
 | `volume` | `import_nrrd(bytes)`, `import_nifti(path)`, `import_dicom(path)` | NRRD, NIfTI, DICOM series. |
 | `picture` | `import(bytes, ImageKind, path) -> Opened` | 13 raster encodings plus animated GIF, WebP, APNG. |

@@ -29,6 +29,7 @@
 *.nii
 *.nii.gz
 *.nrrd
+*.mha
 
 # Scratch renders. `viewer shot` writes PNGs, and none of them are documentation.
 # Anchored to the repository root, so docs/images/ is unaffected.

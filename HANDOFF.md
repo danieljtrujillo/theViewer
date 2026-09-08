@@ -1,12 +1,19 @@
 # Handoff
 
-State as of 2026-08-26. **323 tests passing, clippy clean.** The last release build was 13.3 MB and
-self-contained; the formats added since then have not been release-built yet (see *Next steps*).
+State as of 2026-08-27. **362 tests passing, clippy clean, rustfmt clean, rustdoc clean.** All four
+gates run in CI on every push and pass on `main`.
 
 ## Run it
 
-Double-click **`Open 3D Viewer.vbs`**. It rebuilds when sources changed, then opens the window.
+Double-click **`Open theViewer.vbs`**. It rebuilds when sources changed, then opens the window.
 Build output goes to `tools/build.log`.
+
+A rebuild shows a progress window for its duration: the crate being compiled, the unit count, a
+percentage, elapsed time and an estimate. The numbers are cargo's own, pulled out of its progress
+line, which it emits into a redirected file only because `CARGO_TERM_PROGRESS_WHEN=always` asks it
+to. The percentage is floored so it cannot read 100 while the link is still running, and the
+status names the link separately because fat LTO is the longest step and cargo says nothing during
+it. `docs/BUILDING.md` has the details.
 
 The app is currently **registered in the Windows Open with menu** for `target\release\viewer.exe`,
 because the first-run prompt was accepted. `viewer open-with remove` undoes it;
@@ -50,6 +57,9 @@ Release builds detach from the console. `--features console` keeps it attached, 
 | **OpenUSD** | `.usda` `.usdc` `.usdz` `.usd` | synthetic stages: composition, units, up-axis, transforms |
 | **`.splat`** | `.splat` | synthetic |
 | **PCD** | `.pcd` | synthetic: ascii, binary, binary_compressed |
+| **OFF** | `.off` | corpus: an 800-vertex quad torus, plus C/N/4/ST keyword fixtures |
+| **ASCII points** | `.xyz` `.pts` `.asc` | corpus: a coloured helix and a UTM survey ring |
+| **MetaImage** | `.mhd` `.mha` | corpus: a 64-cubed shell, split and inline, plain and zlib |
 | **LAS / LAZ** | `.las` `.laz` | synthetic |
 | **E57** | `.e57` | synthetic |
 | DICOM series | `.dcm` | a 132-slice MR series |
@@ -77,19 +87,21 @@ many carried a picture, and the decoded extent.
 
 ## Next steps, in order
 
-1. **Release build and a real-file sweep.** Everything since the last release build is debug-tested
-   only. `cargo build --release -p viewer-app`, check the binary still has no MinGW DLL imports
-   (`objdump -p target/release/viewer.exe | grep -i "DLL Name"`), and re-run the table above.
-2. **Binary size.** STEP pulled in `truck` (a CAD kernel) and USD pulled in `openusd`; both are
-   large. Measure, and if the binary has grown past ~25 MB consider moving one or both behind the
-   T1 plugin boundary that `docs/ARCHITECTURE.md` already describes.
-3. **Two copies of `zip`.** `openusd` wants 8.x and this workspace pinned 4.x. Bump ours to 8 so
-   only one is compiled.
-4. **`.sog`** is the last geometry format still detected without an importer. It is a ZIP of
+1. **`.sog`** is the last geometry format still detected without an importer. It is a ZIP of
    `meta.json` plus WebP attribute planes; the decode is documented but there is **no sample on
-   this machine to verify against**, which is why it was not attempted blind.
-5. **Audio.** Video plays silent. WASAPI output plus A/V sync against `Player`'s existing clock.
-6. Update `README.md` and `docs/FORMATS.md`, which still describe the state before this batch.
+   this machine to verify against**, which is why it was not attempted blind. Writing an encoder
+   in `tools/make-corpus.mjs` and decoding that would only prove the two halves agree with each
+   other, so this one waits for a real file.
+2. **Two copies of `zip`.** `openusd` wants 8.x and this workspace pinned 4.x. Bump ours to 8 so
+   only one is compiled.
+3. **Audio.** Video plays silent. WASAPI output plus A/V sync against `Player`'s existing clock.
+4. **Disk.** C: is 517 GB and ran down to 1.9 GB free twice on 2026-08-27, failing a release build
+   both times with `os error 112`. This tree's `target/` reaches about 9 GB with both profiles
+   built, and a fat-LTO release build wants several GB of headroom beyond that. D: had 21 GB free
+   and G: had 7 GB, so pointing `CARGO_TARGET_DIR` at a folder on D: takes the build output off C:
+   entirely. Not done here: it changes the machine rather than the repository. The launcher now
+   recognises the case and says so, rather than reporting an empty log, because the failure that
+   fills the disk is also the one that cannot write its own explanation.
 
 ## Not done
 

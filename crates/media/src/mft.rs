@@ -128,6 +128,7 @@ impl Transform {
         data: &[u8],
         key: bool,
         pts_us: u64,
+        want_pixels: bool,
     ) -> Result<Option<VideoFrame>, MediaError> {
         unsafe {
             let buffer = MFCreateMemoryBuffer(data.len() as u32).map_err(platform)?;
@@ -159,7 +160,7 @@ impl Transform {
                 // The decoder is holding a picture it wants collected first. Draining and
                 // retrying once is the documented response.
                 Err(e) if e.code() == MF_E_NOTACCEPTING => {
-                    let pending = self.pull()?;
+                    let pending = self.pull(want_pixels)?;
                     self.transform
                         .ProcessInput(0, &sample, 0)
                         .map_err(platform)?;
@@ -170,11 +171,11 @@ impl Transform {
                 Err(e) => return Err(platform(e)),
             }
         }
-        self.pull()
+        self.pull(want_pixels)
     }
 
     /// Take one decoded picture, if the transform has one ready.
-    fn pull(&mut self) -> Result<Option<VideoFrame>, MediaError> {
+    fn pull(&mut self, want_pixels: bool) -> Result<Option<VideoFrame>, MediaError> {
         unsafe {
             let mut status = 0u32;
             // A transform that does not allocate its own samples needs one supplied, sized to
@@ -243,7 +244,17 @@ impl Transform {
                 .map_err(platform)?;
             // SAFETY: valid for `length` bytes until the matching `Unlock` below.
             let locked = std::slice::from_raw_parts(data, length as usize);
-            let rgba = self.to_rgba(locked);
+            // The colour conversion is the single most expensive thing on this path: a scalar pass
+            // over 4.2 million pixels at 2048 square, measured at more than a whole 30 fps frame
+            // budget. A caller catching up through a GOP needs the decoder to *decode* every
+            // frame, because the stream is inter-coded, but it only needs the pixels of the one
+            // it is going to show. Converting the rest and dropping them is what turns falling
+            // behind into falling further behind.
+            let rgba = if want_pixels {
+                self.to_rgba(locked)
+            } else {
+                Vec::new()
+            };
             let _ = buffer.Unlock();
 
             Ok(Some(VideoFrame {
@@ -446,27 +457,63 @@ pub fn nv12_to_rgba(data: &[u8], width: usize, height: usize, stride: usize) -> 
     for row in 0..height {
         // Rows are sliced once rather than indexed per pixel: at four million pixels the bounds
         // check is a measurable part of the total.
-        let luma = data
-            .get(row * stride..row * stride + width)
-            .unwrap_or_default();
-        let chroma_start = chroma_base + (row / 2) * stride;
-        let chroma = data
-            .get(chroma_start..chroma_start + width.div_ceil(2) * 2)
-            .unwrap_or_default();
+        // Take as much of the row as exists rather than all-or-nothing. Asking for an exact range
+        // and falling back to an empty slice turns one missing byte into a whole grey row, and on
+        // an odd width the chroma request is `width.div_ceil(2) * 2`, which is one byte wider than
+        // the stride, so the last row asks past the end of a perfectly good buffer.
+        let clamp = |start: usize, want: usize| -> &[u8] {
+            match data.get(start..) {
+                Some(rest) => &rest[..rest.len().min(want)],
+                None => &[],
+            }
+        };
+        let luma = clamp(row * stride, width);
+        let chroma = clamp(chroma_base + (row / 2) * stride, width.div_ceil(2) * 2);
         let target = &mut out[row * width * 4..(row + 1) * width * 4];
 
-        for (x, pixel) in target.chunks_exact_mut(4).enumerate() {
-            // A short buffer reads as black rather than as an out-of-range panic: a decoder that
-            // hands back less than it promised should cost a frame, not the process.
+        // Two pixels at a time, because that is how many share a chroma sample. Working in pairs
+        // takes the three chroma multiplies out of the per-pixel body and, more importantly, lets
+        // all three inputs come from `chunks_exact` iterators: at four million pixels a frame, the
+        // per-pixel bounds check on `luma[x]` and `chroma[x / 2 * 2]` was a large part of the
+        // total, and the whole conversion cost more than a 30 fps frame budget on its own.
+        let pairs = target
+            .chunks_exact_mut(8)
+            .zip(luma.chunks_exact(2))
+            .zip(chroma.chunks_exact(2));
+        let mut done = 0usize;
+        for ((pixels, ys), uv) in pairs {
+            let u = uv[0] as i32 - 128;
+            let v = uv[1] as i32 - 128;
+            // Once per pair rather than once per pixel.
+            let dr = R_V * v;
+            let dg = -G_U * u - G_V * v;
+            let db = B_U * u;
+
+            for k in 0..2 {
+                let base = Y * (ys[k] as i32 - 16) + 128;
+                let p = &mut pixels[k * 4..k * 4 + 4];
+                p[0] = ((base + dr) >> 8).clamp(0, 255) as u8;
+                p[1] = ((base + dg) >> 8).clamp(0, 255) as u8;
+                p[2] = ((base + db) >> 8).clamp(0, 255) as u8;
+                p[3] = 255;
+            }
+            done += 2;
+        }
+
+        // The odd last column of an odd-width frame, and any pixel the decoder did not supply.
+        // A short buffer reads as black rather than as an out-of-range panic: a decoder that
+        // hands back less than it promised should cost a frame, not the process.
+        for x in done..width {
             let y = luma.get(x).copied().unwrap_or(16) as i32 - 16;
             let u = chroma.get((x / 2) * 2).copied().unwrap_or(128) as i32 - 128;
             let v = chroma.get((x / 2) * 2 + 1).copied().unwrap_or(128) as i32 - 128;
 
             let base = Y * y + 128;
-            pixel[0] = ((base + R_V * v) >> 8).clamp(0, 255) as u8;
-            pixel[1] = ((base - G_U * u - G_V * v) >> 8).clamp(0, 255) as u8;
-            pixel[2] = ((base + B_U * u) >> 8).clamp(0, 255) as u8;
-            pixel[3] = 255;
+            let p = &mut target[x * 4..x * 4 + 4];
+            p[0] = ((base + R_V * v) >> 8).clamp(0, 255) as u8;
+            p[1] = ((base - G_U * u - G_V * v) >> 8).clamp(0, 255) as u8;
+            p[2] = ((base + B_U * u) >> 8).clamp(0, 255) as u8;
+            p[3] = 255;
         }
     }
     out
@@ -532,6 +579,49 @@ mod tests {
         for x in 0..w {
             assert!(out[x * 4] > 200, "the first row should be white");
             assert!(out[(w + x) * 4] < 40, "the second row should be black");
+        }
+    }
+
+    /// The pair-at-a-time inner loop against the straightforward per-pixel one it replaced.
+    ///
+    /// Odd widths are the case worth covering: the fast path walks chroma pairs and cannot reach
+    /// the last column of an odd-width frame, which the tail loop has to finish.
+    #[test]
+    fn the_paired_conversion_matches_a_plain_per_pixel_one() {
+        fn reference(data: &[u8], width: usize, height: usize, stride: usize) -> Vec<u8> {
+            let mut out = vec![0u8; width * height * 4];
+            let chroma_base = stride * height;
+            for row in 0..height {
+                for x in 0..width {
+                    let y = data.get(row * stride + x).copied().unwrap_or(16) as i32 - 16;
+                    let c = chroma_base + (row / 2) * stride + (x / 2) * 2;
+                    let u = data.get(c).copied().unwrap_or(128) as i32 - 128;
+                    let v = data.get(c + 1).copied().unwrap_or(128) as i32 - 128;
+                    let base = 298 * y + 128;
+                    let p = (row * width + x) * 4;
+                    out[p] = ((base + 459 * v) >> 8).clamp(0, 255) as u8;
+                    out[p + 1] = ((base - 55 * u - 136 * v) >> 8).clamp(0, 255) as u8;
+                    out[p + 2] = ((base + 541 * u) >> 8).clamp(0, 255) as u8;
+                    out[p + 3] = 255;
+                }
+            }
+            out
+        }
+
+        for (w, h) in [(2, 2), (4, 4), (7, 5), (9, 3), (1, 1), (16, 16)] {
+            let stride = w;
+            let mut data = Vec::new();
+            for i in 0..stride * h {
+                data.push((i * 7 % 256) as u8);
+            }
+            for i in 0..stride * usize::div_ceil(h, 2) {
+                data.push((i * 13 % 256) as u8);
+            }
+            assert_eq!(
+                nv12_to_rgba(&data, w, h, stride),
+                reference(&data, w, h, stride),
+                "{w}x{h}"
+            );
         }
     }
 

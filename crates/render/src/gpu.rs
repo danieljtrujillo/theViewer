@@ -826,15 +826,21 @@ impl Renderer {
             match node.payload.as_ref() {
                 Some(Payload::TriMesh(m)) => {
                     let n = m.vertex_count();
-                    if n == 0 {
-                        continue;
-                    }
                     // A mesh a player rewrites every frame has to be writable from the start.
                     // Discovering that later means rebuilding the buffer on the first frame, and
                     // wgpu rejects the write rather than quietly reallocating.
                     let dynamic = scene
                         .dynamic_meshes
                         .contains(&viewer_scene::NodeId(node_index as u32));
+                    // An empty static mesh is nothing to draw. An empty *dynamic* one is a
+                    // placeholder waiting for its first frame, and skipping it here is fatal:
+                    // no draw is pushed, `dynamic_mesh` stays `None`, `update_mesh` returns
+                    // immediately forever, and the scene reports itself empty. That is what made
+                    // a Depthkit capture, whose importer seeds exactly such a placeholder, open
+                    // with "the file contains nothing to show" while its frames decoded fine.
+                    if n == 0 && !dynamic {
+                        continue;
+                    }
                     let vertex_usage = if dynamic {
                         wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST
                     } else {
@@ -867,13 +873,38 @@ impl Renderer {
                             uv: uv[i],
                         })
                         .collect();
+                    // wgpu refuses a zero-length buffer, and a dynamic placeholder legitimately
+                    // has no vertices yet. One dummy vertex is enough to have something to grow
+                    // from; `count` stays 0, so nothing is drawn from it.
+                    let seed = if verts.is_empty() {
+                        vec![MeshVertex {
+                            pos: [0.0; 3],
+                            nrm: [0.0, 1.0, 0.0],
+                            col: [1.0; 4],
+                            uv: [0.0; 2],
+                        }]
+                    } else {
+                        verts
+                    };
                     let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("mesh vertices"),
-                        contents: bytemuck::cast_slice(&verts),
+                        contents: bytemuck::cast_slice(&seed),
                         usage: vertex_usage,
                     });
 
                     let indices = match &m.indices {
+                        // A dynamic mesh that arrives without indices still needs the buffer to
+                        // exist, because the first decoded frame brings a topology to write into
+                        // it and a buffer cannot appear later.
+                        Indices::U32(v) if v.is_empty() && dynamic => Some((
+                            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("mesh indices"),
+                                contents: bytemuck::cast_slice(&[0u32]),
+                                usage: index_usage,
+                            }),
+                            wgpu::IndexFormat::Uint32,
+                            0,
+                        )),
                         Indices::None => None,
                         Indices::U16(v) => Some((
                             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

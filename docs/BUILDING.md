@@ -56,7 +56,7 @@ $env:Path = "$env:USERPROFILE\.cargo\bin;$env:LOCALAPPDATA\Microsoft\WinGet\Pack
 cargo build -p viewer-app                              # debug, console attached
 cargo build --release -p viewer-app                    # release, console detached
 cargo build --release -p viewer-app --features console # release, console attached
-cargo test --workspace                                 # 323 tests
+cargo test --workspace                                 # 362 tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 cargo doc --workspace --no-deps                        # RUSTDOCFLAGS=-D warnings in CI
@@ -90,18 +90,43 @@ throughput. Fat LTO with a single codegen unit makes a clean release build take 
 
 ## The launcher
 
-`Open 3D Viewer.vbs` at the repository root runs `tools\build-and-run.ps1` through
+`Open theViewer.vbs` at the repository root runs `tools\build-and-run.ps1` through
 `powershell -WindowStyle Hidden`, so nothing flashes on screen. The script:
 
 1. Locates cargo under `%USERPROFILE%\.cargo\bin`, and shows a message box naming the winget
    command if it is missing.
 2. Locates `dlltool.exe` under the winget package tree and prepends its directory to PATH.
-3. Rebuilds only when a `.rs`, `.wgsl` or `.toml` file under `crates\` is newer than
-   `target\release\viewer.exe`.
-4. Launches the binary, forwarding a file path if one was passed to the launcher.
+3. Rebuilds only when a `.rs`, `.wgsl`, `.toml`, `.ico` or `.png` file under `crates\` or
+   `assets\` is newer than `target\release\viewer.exe`. Assets count because the icon is compiled
+   into the executable as a resource.
+4. Shows a progress window for the length of the build.
+5. Launches the binary, forwarding a file path if one was passed to the launcher.
 
 Everything it does goes to `tools\build.log`, which is overwritten on each run. A failed build
-raises a message box pointing at that log, because the script runs with no console to print to.
+raises a message box carrying the first few `error` lines and pointing at that log, because the
+script runs with no console to print to.
+
+### The progress window
+
+A release build of this dependency tree runs several minutes and the launcher is deliberately
+windowless, so without this a double-click sat there doing nothing visible.
+
+The numbers are cargo's own, not an estimate. `CARGO_TERM_PROGRESS_WHEN=always` makes cargo emit
+its progress line even when its output is redirected to a file, which is the only way to get a
+real unit total; left alone it suppresses progress for anything that is not a terminal. The script
+starts cargo with its output redirected, then a 250 ms timer reads the file through a shared handle
+and parses two things out of it: `Building [...] 464/465` for the count, and the last
+`Compiling <crate>` line for what is being worked on right now.
+
+Three details are there to keep it honest rather than pretty:
+
+- The percentage is floored. 464 of 465 rounds to 100, and a bar that reads 100% while the build
+  is still going is the thing the window exists to prevent.
+- When every unit is compiled and cargo has not yet said `Finished`, the status switches to
+  `Linking and optimizing viewer.exe`. That is the fat LTO pass, it is frequently the longest
+  single step, and cargo reports nothing at all while it runs.
+- Cancel kills the compiler through `taskkill /T`, because `rustc` runs as a child process and
+  would otherwise carry on with nothing watching it.
 
 ## Self-containment
 
@@ -140,12 +165,32 @@ chain: `libstdc++` calls into `libgcc` for thread-local storage, `libgcc` calls 
 `libwinpthread` for its mutexes, and `libwinpthread` calls back into the C runtime.
 `--start-group` makes the linker re-scan until nothing new resolves.
 
-`crates/app/build.rs` is a one-line `include!` of the same file, because link arguments apply only
-to the package that emits them and both the test harness and the binary need them.
+`crates/app/build.rs` includes the same file, because link arguments apply only to the package
+that emits them and both the test harness and the binary need them. It has a second job as well:
+compiling `assets/icon.ico` and a version block into `viewer.exe` through `windres`.
 
 The same constraint is why the meshopt C++ bindings were replaced by a Rust port in
 `crates/formats/src/meshopt.rs`. The bindings crate hard-codes a dynamic `-lstdc++` for
 `windows-gnu`.
+
+## Icons
+
+```powershell
+node tools\make-icons.mjs
+```
+
+Reads `assets\icon-source.png` and `assets\favicon-source.png` and writes `icon.png`, `icon.ico`,
+`favicon.png` and `favicon.ico` beside them. The generated files are tracked, so this only needs
+running when the artwork changes.
+
+Like the corpus generator, it carries no dependencies: it decodes and encodes PNG through Node's
+own zlib and assembles the ICO container by hand. Sizes 16 through 128 are written as 32-bit BMP
+entries and 256 as PNG, which is what Windows expects.
+
+`viewer.exe` gets its icon two ways, because two different things read it. Explorer, the taskbar
+and the Open with menu read the resource `crates\app\build.rs` compiles in with `windres`, and the
+window itself carries the PNG that `crates\app\src\ui.rs` embeds. A missing `windres` downgrades
+to a build warning rather than a failure: a blank icon is cosmetic.
 
 ## Test corpus
 
@@ -165,6 +210,11 @@ Writes `corpus\`:
 | `splats.ply` | 60,000-splat 3DGS PLY torus |
 | `panorama360.png` | Equirectangular test pattern carrying GPano metadata |
 | `unlabelled-2to1.png` | The same pattern carrying nothing |
+| `points.xyz` | 4,000-point coloured helix, `x y z r g b` |
+| `survey.pts` | 2,000 points in the seven-column Leica layout, at UTM coordinates |
+| `torus.off` | 800-vertex OFF torus with quad faces |
+| `volume.mhd` plus `volume.raw` | 64-cubed MetaImage volume, split across two files |
+| `volume.mha` | The same volume inline and zlib-compressed |
 
 The two panoramas exist so both the declared and the guessed detection paths have a fixture.
 

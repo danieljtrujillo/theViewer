@@ -244,7 +244,6 @@ pub fn import(bytes: &[u8]) -> Result<Scene, ImportError> {
             Encoding::BinaryCompressed => "binary_compressed",
         },
     );
-    scene.set_meta("points", count.to_string());
     scene.set_meta(
         "fields",
         header

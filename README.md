@@ -1,16 +1,18 @@
+<p align="center"><img src="assets/icon.png" alt="theViewer" width="128"></p>
+
 <h1 align="center">theViewer</h1>
 
-<p align="center"><strong>by <a href="https://github.com/danieljtrujillo">Daniel Joaquin Trujillo</a></strong></p>
+<p align="center"><strong>by <a href="https://gantasmo.com">GANTASMO</a></strong></p>
 
 <p align="center">
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.98%20stable--gnu-000000?logo=rust&logoColor=white" alt="Rust 1.98 stable-gnu"></a>
   <a href="https://wgpu.rs/"><img src="https://img.shields.io/badge/wgpu-23-3B5BA5?logo=webgpu&logoColor=white" alt="wgpu 23"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0A9396?logo=windows&logoColor=white" alt="Platform: Windows 10 and 11">
-  <img src="https://img.shields.io/badge/binary-16.3%20MB%2C%20zero%20redistributables-7C3AED" alt="One 16.3 MB binary, no redistributables">
+  <img src="https://img.shields.io/badge/binary-16.5%20MB%2C%20zero%20redistributables-7C3AED" alt="One 16.5 MB binary, no redistributables">
   <br>
   <img src="https://img.shields.io/badge/formats-~230%20extensions%20surveyed-2BB3A3" alt="Around 230 extensions surveyed">
   <img src="https://img.shields.io/badge/renderer-6%20paths-E09A3A" alt="Six renderer paths">
-  <img src="https://img.shields.io/badge/tests-323%20passing-46C47A" alt="323 tests passing">
+  <img src="https://img.shields.io/badge/tests-362%20passing-46C47A" alt="362 tests passing">
   <img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-F4A261" alt="MIT OR Apache-2.0">
 </p>
 
@@ -20,7 +22,7 @@ Microsoft deprecated Windows 3D Viewer in February 2026, removed it from Windows
 pulled it from the Microsoft Store in July. No shipped desktop 3D viewer currently exists on the
 platform.
 
-**theViewer** is the replacement. Native Rust and wgpu. One 16.3 MB executable that imports 20
+**theViewer** is the replacement. Native Rust and wgpu. One 16.5 MB executable that imports 20
 Windows system DLLs and nothing else: no webview, no runtime, no redistributables. Double-click a
 file and it opens, whether that file is a printer STL, a 132-slice MR series, a 60,000-splat
 capture, a phone panorama, or nine seconds of volumetric video.
@@ -36,7 +38,7 @@ which is what keeps a survey of around 230 extensions from turning into 230 spec
 
 ## Quickstart
 
-**Double-click `Open 3D Viewer.vbs`. That is the entire setup.** It builds when the sources have
+**Double-click `Open theViewer.vbs`. That is the entire setup.** It builds when the sources have
 changed, then opens the window. Build output goes to `tools\build.log`.
 
 `target\release\viewer.exe` also runs directly, with or without a file path. On first launch it
@@ -67,9 +69,12 @@ formats that cannot simply be supported and why. What works today:
 | PCD | `.pcd` | synthetic: ascii, binary, binary_compressed |
 | LAS and LAZ | `.las` `.laz` | synthetic |
 | E57 | `.e57` | synthetic |
+| Geomview OFF, and the `C`, `N`, `4` and `ST` variants | `.off` | corpus, an 800-vertex quad torus |
+| ASCII point clouds | `.xyz` `.pts` `.asc` | corpus, both the colour and the Leica layouts |
 | DICOM series | `.dcm` | a 132-slice MR series |
 | NIfTI | `.nii` `.nii.gz` | synthetic |
 | NRRD | `.nrrd` | synthetic |
+| MetaImage, split and inline, plain and zlib | `.mhd` `.mha` | corpus, a 64-cubed shell |
 
 OBJ and FBX load their materials and textures from the same folder automatically. Opening one
 DICOM slice stacks the whole series into a volume, ordered by `ImagePositionPatient` projected on
@@ -219,17 +224,17 @@ plugins/          T1 formats, resolved lazily. Empty today.
 tools/            The build-and-launch script and the corpus generator.
 ```
 
-21,426 lines of Rust and 539 of WGSL across six crates. `viewer-scene` has no dependencies at all,
+23,311 lines of Rust and 539 of WGSL across six crates. `viewer-scene` has no dependencies at all,
 which is deliberate: everything imports into it, so it is the piece that must never churn.
 
 | Crate | Rust | Tests |
 |---|---|---|
-| `viewer-scene` | 1,470 | 25 |
-| `viewer-io` | 1,435 | 36 |
-| `viewer-media` | 1,559 | 17 |
-| `viewer-formats` | 11,557 | 199 |
-| `viewer-render` | 2,632 | 32 |
-| `viewer-app` | 2,701 | 14 |
+| `viewer-scene` | 1,476 | 25 |
+| `viewer-io` | 1,666 | 46 |
+| `viewer-media` | 1,560 | 17 |
+| `viewer-formats` | 12,989 | 231 |
+| `viewer-render` | 2,649 | 32 |
+| `viewer-app` | 2,777 | 36 |
 
 ## Build
 
@@ -286,9 +291,9 @@ State as of 2026-08-26.
 |---|---|
 | `cargo fmt --all -- --check` | Clean |
 | `cargo clippy --workspace --all-targets -- -D warnings` | Clean. Two transitive dependencies carry a future-incompatibility notice. |
-| `cargo test --workspace` | 323 passing, 0 failing |
+| `cargo test --workspace` | 362 passing, 0 failing |
 | `cargo doc --workspace --no-deps` | Clean with `RUSTDOCFLAGS=-D warnings` |
-| Release binary | 17,091,072 bytes |
+| Release binary | 17,298,432 bytes |
 | `objdump -p` imports | 20 DLLs, every one a Windows system DLL |
 
 All four gates run on every push through [.github/workflows/ci.yml](.github/workflows/ci.yml).

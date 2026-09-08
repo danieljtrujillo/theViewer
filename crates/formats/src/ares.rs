@@ -10,9 +10,12 @@
 //! `demuxer.ts` and `geometry.ts`, and against its real output. Three things from that reading
 //! are load-bearing and easy to get wrong:
 //!
-//! 1. **Positions stay quantized to the superblock's AABB.** `world = min + (q / levels) * size`,
-//!    where `levels = (1 << quant_bits_pos) - 1` and `q` is `u16` at stride 4, x and y in the
-//!    first `u32`, z in the low half of the second.
+//! 1. **Positions are quantized against the chunk's own AABB.** `world = min + (q / levels) *
+//!    size`, where `levels = (1 << quant_bits_pos) - 1`, `q` is `u16` at stride 4, and `min` and
+//!    `size` come from the box in each chunk's header. The superblock's box spans the whole
+//!    sequence: it is what the camera should frame and the wrong thing to dequantize against,
+//!    because rescaling a frame from its own box up to the clip's stretches each axis by a
+//!    different ratio. Measured on a real capture, that is a subject 2.07 times too wide.
 //! 2. **Predicted frames are deltas on the quantized integers**, wrapping at 16 bits, not on the
 //!    dequantized floats. Adding them in world space accumulates error across a GOP.
 //! 3. **A predicted frame inherits the intra frame's topology.** Its index buffer is absent, not
@@ -342,8 +345,20 @@ fn texture_track_fourcc(bytes: &[u8], offset: u64) -> Option<String> {
     None
 }
 
+/// A chunk's own header: the box its geometry was quantized against, and its block directory.
+///
+/// The box is the important part and it is easy to miss. Positions are quantized *per chunk*,
+/// against the box stored here, not against the superblock's box for the whole sequence. Reading
+/// past this field and dequantizing against the superblock stretches every frame to fill the
+/// extent of the entire clip: a subject that moves three metres across the shot comes out three
+/// metres wide in every single frame, squashed in whichever axis moved least.
+struct Chunk {
+    bounds: Aabb,
+    blocks: Vec<BlockRef>,
+}
+
 /// A chunk's block directory, with every offset resolved to an absolute, bounds-checked one.
-fn parse_chunk(bytes: &[u8], gop: &Gop) -> Result<Vec<BlockRef>, ImportError> {
+fn parse_chunk(bytes: &[u8], gop: &Gop) -> Result<Chunk, ImportError> {
     let base =
         usize::try_from(gop.byte_offset).map_err(|_| malformed("chunk offset out of range"))?;
     let mut r = Reader::at(bytes, base);
@@ -353,12 +368,12 @@ fn parse_chunk(bytes: &[u8], gop: &Gop) -> Result<Vec<BlockRef>, ImportError> {
             "chunk at {base} does not start with CNK0"
         )));
     }
-    let mut read = || -> Option<Vec<BlockRef>> {
+    let mut read = || -> Option<Chunk> {
         r.u64()?; // pts
         r.u16()?; // frame count
         r.u16()?; // flags
-        r.f32x3()?; // gop aabb min
-        r.f32x3()?; // gop aabb max
+        let min = r.f32x3()?;
+        let max = r.f32x3()?;
         let block_count = r.u16()?;
         let mut out = Vec::new();
         for _ in 0..block_count {
@@ -377,7 +392,10 @@ fn parse_chunk(bytes: &[u8], gop: &Gop) -> Result<Vec<BlockRef>, ImportError> {
                 length,
             });
         }
-        Some(out)
+        Some(Chunk {
+            bounds: Aabb { min, max },
+            blocks: out,
+        })
     };
     read().ok_or_else(|| malformed("truncated chunk directory"))
 }
@@ -541,22 +559,52 @@ fn decode_meshopt_bytes(bytes: &[u8], vertex_count: usize) -> Result<Vec<u8>, Im
 }
 
 /// Turn quantized geometry into the world-space frame the renderer takes.
-fn to_mesh_frame(q: &QuantGeometry, superblock: &Superblock, include_indices: bool) -> MeshFrame {
+///
+/// `chunk_bounds` is the box the chunk header declares. See the note inside on why it is not the
+/// dequantization basis.
+fn to_mesh_frame(
+    q: &QuantGeometry,
+    superblock: &Superblock,
+    chunk_bounds: &Aabb,
+    include_indices: bool,
+) -> MeshFrame {
     let levels = ((1u32 << superblock.quant_bits_pos.clamp(1, 16)) - 1) as f32;
-    let min = superblock.bounds.min;
-    let size = superblock.bounds.extent();
+
+    // The chunk's box, not the superblock's, and the difference is the whole subject's shape.
+    //
+    // Measured on `daniel-coherent-v4.ares`, one frame of a standing adult:
+    //   against the chunk box       0.68 x 1.70 x 0.50 m   correct proportions
+    //   against the superblock box  1.47 x 1.77 x 0.94 m   2.07x too wide
+    //
+    // The superblock's box spans the whole nine-second clip, across which the subject travels.
+    // Rescaling each frame from its own box up to that one stretches every axis by a different
+    // ratio, most in whichever direction the subject moved furthest and least in height, which
+    // reads as horizontally stretched and vertically squished.
+    //
+    // The superblock box remains the right thing to frame the camera on, and that is where it is
+    // still used.
+    let basis = if chunk_bounds.is_empty() || chunk_bounds.extent().iter().any(|e| *e <= 0.0) {
+        &superblock.bounds
+    } else {
+        chunk_bounds
+    };
+    let min = basis.min;
+    let size = basis.extent();
 
     let mut positions = Vec::with_capacity(q.vertex_count);
+    let mut bounds = Aabb::EMPTY;
     for i in 0..q.vertex_count {
         let base = i * 4;
         let x = *q.positions.get(base).unwrap_or(&0) as f32;
         let y = *q.positions.get(base + 1).unwrap_or(&0) as f32;
         let z = *q.positions.get(base + 2).unwrap_or(&0) as f32;
-        positions.push([
+        let p = [
             min[0] + (x / levels) * size[0],
             min[1] + (y / levels) * size[1],
             min[2] + (z / levels) * size[2],
-        ]);
+        ];
+        bounds.expand(p);
+        positions.push(p);
     }
 
     let mut uvs = Vec::new();
@@ -581,9 +629,15 @@ fn to_mesh_frame(q: &QuantGeometry, superblock: &Superblock, include_indices: bo
         } else {
             Vec::new()
         },
-        // The superblock's box is the whole sequence's, which is what the camera should frame:
-        // reframing on each frame's own bounds makes a walking figure pump in and out of view.
-        bounds: superblock.bounds,
+        // This frame's own box, measured from the vertices that are actually in it.
+        //
+        // It used to be the superblock's, on the reasoning that the camera should frame the whole
+        // sequence rather than pump in and out as a figure walks. That reasoning was sound and the
+        // place was wrong: the app frames on the scene's bounds, never on these, so all this did
+        // was make every frame report the extent of the entire clip. `viewer info` printed that
+        // number as the decoded extent, which is how a nine-second capture came to claim each of
+        // its frames was 1,473 metres wide.
+        bounds,
     }
 }
 
@@ -804,9 +858,11 @@ impl GeometryDecoder {
         let gop = self.gops[gop_index];
         let target = (frame.saturating_sub(gop.frame_start)) as usize;
 
-        let blocks = parse_chunk(bytes, &gop)?;
-        let geometry: Vec<BlockRef> = blocks
-            .into_iter()
+        let chunk = parse_chunk(bytes, &gop)?;
+        let geometry: Vec<BlockRef> = chunk
+            .blocks
+            .iter()
+            .copied()
             .filter(|b| b.kind == block::GEOMETRY_I || b.kind == block::GEOMETRY_PB)
             .collect();
         if geometry.is_empty() {
@@ -866,7 +922,12 @@ impl GeometryDecoder {
 
         let geometry_state =
             geometry_state.ok_or_else(|| malformed("a GOP has no decodable geometry"))?;
-        let out = to_mesh_frame(&geometry_state, &self.superblock, fresh_topology);
+        let out = to_mesh_frame(
+            &geometry_state,
+            &self.superblock,
+            &chunk.bounds,
+            fresh_topology,
+        );
         self.state = Some(DecodedState {
             gop: gop_index,
             position: target,
@@ -881,10 +942,10 @@ impl GeometryDecoder {
         let Some(gop) = self.gops.get(gop_index) else {
             return Vec::new();
         };
-        let Ok(blocks) = parse_chunk(bytes, gop) else {
+        let Ok(chunk) = parse_chunk(bytes, gop) else {
             return Vec::new();
         };
-        let Some(block) = blocks.iter().find(|b| b.kind == block::TEXTURE_COLOR) else {
+        let Some(block) = chunk.blocks.iter().find(|b| b.kind == block::TEXTURE_COLOR) else {
             return Vec::new();
         };
         parse_texture_block(
@@ -1086,15 +1147,31 @@ impl AresSource {
             if track.fed.is_some_and(|fed| fed >= frame_index) {
                 continue;
             }
-            match decoder.decode(&bytes[range], is_key, frame_index as u64) {
+            // Only the frame being shown needs its pixels. The ones before it have to be decoded
+            // so the stream stays decodable, and their colour conversion would be thrown away
+            // one line later: on a 2048 square texture that conversion is the single largest cost
+            // on this path, so converting a whole group of pictures to display one of them is
+            // what makes falling behind compound.
+            let wanted = frame_index == index;
+            let decoded = if wanted {
+                decoder.decode(&bytes[range], is_key, frame_index as u64)
+            } else {
+                decoder.decode_without_pixels(&bytes[range], is_key, frame_index as u64)
+            };
+            match decoded {
                 Ok(Some(frame)) => {
                     track.fed = Some(frame_index);
-                    image = Some(Image {
-                        name: "texture".into(),
-                        width: frame.width,
-                        height: frame.height,
-                        rgba: frame.rgba,
-                    });
+                    // A decoder runs a picture or two behind its input, so the frame that comes
+                    // back here is not always the one just fed. Anything without pixels was one
+                    // of the catch-up frames and is not for showing.
+                    if !frame.rgba.is_empty() {
+                        image = Some(Image {
+                            name: "texture".into(),
+                            width: frame.width,
+                            height: frame.height,
+                            rgba: frame.rgba,
+                        });
+                    }
                 }
                 Ok(None) => track.fed = Some(frame_index),
                 // A texture that stops decoding should not stop the geometry. The message is
@@ -1206,7 +1283,7 @@ mod tests {
             normals: Vec::new(),
             indices: vec![0, 1, 2],
         };
-        let frame = to_mesh_frame(&q, &superblock, true);
+        let frame = to_mesh_frame(&q, &superblock, &superblock.bounds, true);
         assert_eq!(frame.positions[0], [-1.0, 0.0, 2.0]);
         assert_eq!(frame.positions[1], [1.0, 4.0, 6.0]);
         for (got, want) in frame.positions[2].iter().zip([0.0, 2.0, 4.0]) {
